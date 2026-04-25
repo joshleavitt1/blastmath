@@ -55,6 +55,9 @@ window.primeResponsiveSfx = window.primeResponsiveSfx || function() {};
     maxSkullTilesOnBoard: 2
   };
 
+  var STRIPE_CHECKOUT_URL = 'https://buy.stripe.com/test_00w00ifyMbn25uxaGQ8AE00';
+  var STRIPE_SUCCESS_PARAM = 'bm_paid';
+
   var SFX_VOLUME = {
     pickup: 0.2,
     place: 0.4,
@@ -743,6 +746,25 @@ function clearClassicPaywallLock() {
 function readUserIsPaid() {
   try {
     return localStorage.getItem('bm_user_valid') === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+function completeStripeReturnIfPresent() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+
+    if (params.get(STRIPE_SUCCESS_PARAM) !== '1') return false;
+
+    localStorage.setItem('bm_user_valid', 'true');
+    clearClassicPaywallLock();
+    clearSavedGame('daily');
+    clearSavedGame('game');
+
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    return true;
   } catch (e) {
     return false;
   }
@@ -3063,19 +3085,11 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
   function bindDailyPaywall(root, state, render) {
     var close = root.querySelector('[data-daily-paywall-close]');
     var cta = root.querySelector('[data-daily-paywall-cta]');
-    var emailDismiss = root.querySelector('[data-paywall-email-dismiss]');
-    var emailContinue = root.querySelector('[data-paywall-email-continue]');
   
     if (close) {
       close.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
-  
-        var modal = root.querySelector('[data-paywall-email-modal]');
-        if (modal && modal.classList.contains('is-open')) {
-          setPaywallEmailModalOpen(root, false);
-          return;
-        }
   
         state.screen = 'home';
         render();
@@ -3086,66 +3100,8 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
       cta.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
-        setPaywallEmailModalOpen(root, true);
-      };
-    }
   
-    if (emailDismiss) {
-      emailDismiss.onclick = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        setPaywallEmailModalOpen(root, false);
-      };
-    }
-
-    if (emailContinue) {
-      emailContinue.onclick = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-    
-        var input = root.querySelector('[data-paywall-email-input]');
-        var email = input ? String(input.value || '').trim() : '';
-    
-        if (!email || !email.includes('@')) {
-          if (input) input.focus();
-          return;
-        }
-    
-        localStorage.setItem('bm_user_email', email);
-        localStorage.setItem('bm_user_valid', 'true');
-        state.isPaid = true;
-        clearClassicPaywallLock();
-        state.daily = {
-          active: false,
-          puzzleId: null,
-          challengeId: 'easy',
-          gemTarget: 0,
-          gemsRemaining: 0,
-          completed: false,
-          failed: false,
-          variantSeed: null,
-          layoutIndices: [],
-          tries: 1,
-          startedAt: 0,
-          finishedAt: 0,
-          showingLossModal: false,
-          showingResultScreen: false
-        };
-    
-        setPaywallEmailModalOpen(root, false);
-    
-        state.screen = 'home';
-        render();
-      };
-    }
-    
-    var emailInput = root.querySelector('[data-paywall-email-input]');
-    if (emailInput && emailContinue) {
-      emailInput.onkeydown = function (e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          emailContinue.click();
-        }
+        window.location.href = STRIPE_CHECKOUT_URL;
       };
     }
   }
@@ -3153,19 +3109,11 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
   function bindClassicPaywall(root, state, render) {
     var close = root.querySelector('[data-classic-paywall-close]');
     var cta = root.querySelector('[data-classic-paywall-cta]');
-    var emailDismiss = root.querySelector('[data-paywall-email-dismiss]');
-    var emailContinue = root.querySelector('[data-paywall-email-continue]');
   
     if (close) {
       close.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
-  
-        var modal = root.querySelector('[data-paywall-email-modal]');
-        if (modal && modal.classList.contains('is-open')) {
-          setPaywallEmailModalOpen(root, false);
-          return;
-        }
   
         state.screen = 'home';
         render();
@@ -3176,67 +3124,8 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
       cta.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
-        setPaywallEmailModalOpen(root, true);
-      };
-    }
   
-    if (emailDismiss) {
-      emailDismiss.onclick = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        setPaywallEmailModalOpen(root, false);
-      };
-    }
-  
-    if (emailContinue) {
-      emailContinue.onclick = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-  
-        var input = root.querySelector('[data-paywall-email-input]');
-        var email = input ? String(input.value || '').trim() : '';
-  
-        if (!email || !email.includes('@')) {
-          if (input) input.focus();
-          return;
-        }
-  
-        localStorage.setItem('bm_user_email', email);
-        localStorage.setItem('bm_user_valid', 'true');
-        state.isPaid = true;
-        clearClassicPaywallLock();
-  
-        setPaywallEmailModalOpen(root, false);
-  
-        state.daily = {
-          active: false,
-          puzzleId: null,
-          challengeId: 'easy',
-          gemTarget: 0,
-          gemsRemaining: 0,
-          completed: false,
-          failed: false,
-          variantSeed: null,
-          layoutIndices: [],
-          tries: 1,
-          startedAt: 0,
-          finishedAt: 0,
-          showingLossModal: false,
-          showingResultScreen: false
-        };
-        
-        state.screen = 'home';
-        render();
-      };
-    }
-  
-    var emailInput = root.querySelector('[data-paywall-email-input]');
-    if (emailInput && emailContinue) {
-      emailInput.onkeydown = function (e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          emailContinue.click();
-        }
+        window.location.href = STRIPE_CHECKOUT_URL;
       };
     }
   }
@@ -3517,8 +3406,7 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
           '<button class="bm-btn bm-btn--classic bm-daily-paywall__cta" type="button" data-daily-paywall-cta>Finish Challenge</button>' +
         '</div>' +
   
-      '</section>' +
-      renderPaywallEmailModal();
+      '</section>'
   }
 
   function renderClassicPaywallScreen(state) {
@@ -3564,8 +3452,7 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
           '<button class="bm-btn bm-btn--classic bm-daily-paywall__cta" type="button" data-classic-paywall-cta>Keep Playing</button>' +
         '</div>' +
   
-      '</section>' +
-      renderPaywallEmailModal();
+      '</section>'
   }
 
   function renderPaywallEmailModal() {
@@ -5142,7 +5029,7 @@ var gemIcon = dailyChallenge
     mount.innerHTML = '<div class="bm-stage" data-stage></div>';
     var root = mount.querySelector('[data-stage]');
     var state = {
-      isPaid: readUserIsPaid(),
+      isPaid: completeStripeReturnIfPresent() || readUserIsPaid(),
       screen: 'boot',
       highScore: readHighScore(),
       score: 0,
