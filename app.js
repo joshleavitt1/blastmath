@@ -55,7 +55,7 @@ window.primeResponsiveSfx = window.primeResponsiveSfx || function() {};
     maxSkullTilesOnBoard: 2
   };
 
-  var STRIPE_CHECKOUT_URL = 'https://buy.stripe.com/test_00w00ifyMbn25uxaGQ8AE00';
+  var STRIPE_CHECKOUT_URL = 'https://buy.stripe.com/aFaeVcfHP0tedCBcRq5c401';
   var STRIPE_SUCCESS_PARAM = 'bm_paid';
 
   var SFX_VOLUME = {
