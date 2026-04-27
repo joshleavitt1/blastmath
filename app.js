@@ -660,6 +660,13 @@ function openDailyCompletedLanding(state) {
 }
 
 function openDailyPaywall(state) {
+  if (window.posthog) {
+    trackEvent('paywall_shown', {
+      mode: 'daily',
+      reason: 'medium_locked'
+    });
+  }
+
   state.screen = 'daily-paywall';
 }
 
@@ -672,16 +679,14 @@ function openClassicPaywall(state, reason) {
   state.classicPaywall.shown = true;
   state.classicPaywall.reason = reason || 'unknown';
   lockClassicPaywall();
-  state.screen = 'classic-paywall';
-
   if (window.posthog) {
-    trackEvent('classic_paywall_shown', {
+    trackEvent('paywall_shown', {
+      mode: 'classic',
       reason: state.classicPaywall.reason,
-      score: state.score,
-      losses: state.classicPaywall.losses || 0,
-      moves: state.moveCount || 0
+      score: state.score
     });
   }
+  state.screen = 'classic-paywall';
 
   return true;
 }
@@ -758,6 +763,11 @@ function completeStripeReturnIfPresent() {
     if (params.get(STRIPE_SUCCESS_PARAM) !== '1') return false;
 
     localStorage.setItem('bm_user_valid', 'true');
+    if (window.posthog) {
+      trackEvent('payment_returned_success', {
+        source: 'stripe_redirect'
+      });
+    }
     clearClassicPaywallLock();
     clearSavedGame('daily');
     clearSavedGame('game');
@@ -1975,6 +1985,71 @@ function formatDailyElapsedTime(startedAt, finishedAt) {
   return minutes + ':' + String(seconds).padStart(2, '0');
 }
 
+function getFallbackDailyPercentile(state) {
+  if (!state || !state.daily) return 75;
+
+  var tries = Math.max(1, state.daily.tries || 1);
+
+  function rand(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  if (tries === 1) {
+    return rand(80, 90);
+  }
+
+  if (tries === 2) {
+    return rand(70, 80);
+  }
+
+  return rand(60, 70);
+}
+
+function getDailyPercentileText(state) {
+  var value = state && state.daily && typeof state.daily.percentile === 'number'
+  ? state.daily.percentile
+  : getFallbackDailyPercentile(state);
+
+  value = Math.max(0, Math.min(99, Math.round(value)));
+
+  return String(value);
+}
+
+function fetchDailyPercentile(state, render) {
+  if (!state || !state.daily || !state.daily.completed) return;
+
+  var challengeId = state.daily.challengeId;
+  var tries = state.daily.tries || 1;
+  var elapsedMs = Math.max(0, (state.daily.finishedAt || Date.now()) - (state.daily.startedAt || Date.now()));
+  var puzzleId = state.daily.puzzleId || getCurrentDailyPuzzleKey();
+
+  fetch('/api/daily-percentile', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      puzzle_id: puzzleId,
+      challenge_id: challengeId,
+      tries: tries,
+      elapsed_ms: elapsedMs
+    })
+  })
+    .then(function (res) {
+      if (!res.ok) throw new Error('daily percentile failed');
+      return res.json();
+    })
+    .then(function (data) {
+      if (!data || typeof data.percentile !== 'number') return;
+
+      state.daily.percentile = data.percentile;
+      render();
+    })
+    .catch(function () {
+      state.daily.percentile = getFallbackDailyPercentile();
+    });
+}
+
 function createDailyStatsMap(stats) {
   return {
     easy: Object.assign({ tries: 1, startedAt: 0, finishedAt: 0, completed: false }, stats && stats.easy),
@@ -2068,7 +2143,8 @@ function startDailyGame(state, challengeId, options) {
     startedAt: resolvedStartedAt,
     finishedAt: resolvedFinishedAt,
     showingLossModal: false,
-    showingResultScreen: false
+    showingResultScreen: false,
+    percentile: null
   };
 
   state.board = seeded.board;
@@ -2088,13 +2164,6 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
 
   startDailyGame(state, challengeId, options);
   playSfx('start');
-
-  if (window.posthog) {
-    trackEvent('daily_started', {
-      puzzle_id: state.daily && state.daily.puzzleId,
-      challenge_id: state.daily && state.daily.challengeId
-    });
-  }
 
   render();
 }
@@ -2211,8 +2280,6 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
       state.classicPaywall.losses = (state.classicPaywall.losses || 0) + 1;
       
       openClassicLifeLossModal(state);
-      
-      if (window.posthog) trackEvent('life_lost', { lives_remaining: state.lives, score: state.score });
 
       playSfx('lose');
       syncHudUi(root, state);
@@ -2249,14 +2316,6 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
   
     window.setTimeout(function () {
       playSfx('lose');
-  
-      if (window.posthog) {
-        trackEvent('game_over', {
-          score: state.score,
-          high_score: state.highScore,
-          level: state.levelId
-        });
-      }
   
       clearSavedGame('game');
   
@@ -2319,12 +2378,13 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
           puzzle_id: state.daily.puzzleId,
           challenge_id: state.daily.challengeId,
           tries: state.daily.tries,
-          elapsed_time: state.daily.finishedAt - state.daily.startedAt
+          elapsed_ms: state.daily.finishedAt - state.daily.startedAt
         });
       }
 
       playSfx('combo');
       render();
+      fetchDailyPercentile(state, render);
       return true;
     }
 
@@ -2338,15 +2398,6 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
       var failedStats = getDailyChallengeStats(state, state.daily.challengeId);
       failedStats.tries = (failedStats.tries || 1) + 1;
       state.daily.tries = failedStats.tries;
-
-      if (window.posthog) {
-        trackEvent('daily_failed', {
-          puzzle_id: state.daily.puzzleId,
-          challenge_id: state.daily.challengeId,
-          gems_remaining: state.daily.gemsRemaining,
-          tries: state.daily.tries
-        });
-      }
 
       playSfx('lose');
       render();
@@ -2801,7 +2852,6 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
       var oldMsg = document.body.querySelector('.bm-board-message');
       if (oldMsg) oldMsg.remove();
 
-      if (window.posthog) trackEvent('intro_skipped', { intro_step: state.intro && state.intro.step });
       runIntroExitToFreshBoard(root, state, render, { playComboSfx: true });
     };
 
@@ -3100,7 +3150,14 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
       cta.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
-  
+    
+        if (window.posthog) {
+          trackEvent('paywall_cta_clicked', {
+            mode: 'daily',
+            price: 4.99
+          });
+        }
+    
         window.location.href = STRIPE_CHECKOUT_URL;
       };
     }
@@ -3124,7 +3181,15 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
       cta.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
-  
+    
+        if (window.posthog) {
+          trackEvent('paywall_cta_clicked', {
+            mode: 'classic',
+            price: 4.99,
+            score: state.score
+          });
+        }
+    
         window.location.href = STRIPE_CHECKOUT_URL;
       };
     }
@@ -3343,7 +3408,7 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
   
         '<div class="bm-daily-result__title">' + challenge.label + ' Challenge Complete</div>' +
   
-        '<div class="bm-daily-result__subtitle">You beat 68% of players on today’s ' + challenge.label + ' Challenge</div>' +
+        '<div class="bm-daily-result__subtitle">You beat ' + getDailyPercentileText(state) + '% of players on today’s ' + challenge.label + ' Challenge</div>' +
   
         '<div class="bm-daily-result__stats">' +
           '<div class="bm-daily-result__stat">' +
@@ -4090,7 +4155,6 @@ var gemIcon = dailyChallenge
       }
 
       markIntroSeen();
-      if (window.posthog) trackEvent('intro_completed');
 
       clearSavedGame('game');
 
@@ -4270,7 +4334,6 @@ var gemIcon = dailyChallenge
       pointsMessageDelay = Math.max(pointsMessageDelay, specialLifeDelay + BLAST_MESSAGE_STEP_DELAY);
     }
 
-    if (window.posthog) trackEvent('blast_triggered', { tiles_cleared: blastResult.blastIndices.length, score_awarded: blastResult.scoreValue, combo_step: comboStep });
     addScore(root, state, blastResult.scoreValue, true);
 
     var moved = applyGravity(state.board, state.boardSize);
@@ -4291,7 +4354,6 @@ var gemIcon = dailyChallenge
             var finalComboLabel = 'Combo ' + Math.min(comboStep, 4) + 'x';
             var finalComboAnchor = blastAnchor;
             var finalComboPoints = state.pendingComboPoints;
-            if (window.posthog) trackEvent('combo_achieved', { combo_step: comboStep, total_score_awarded: finalComboPoints });
 
             window.setTimeout(function () {
               playSfx('combo');
@@ -4949,7 +5011,6 @@ var gemIcon = dailyChallenge
       var prevHighScore = state.highScore;
       state.highScore = state.score;
       writeHighScore(state.highScore);
-      if (window.posthog) trackEvent('new_high_score', { score: state.score, previous_high_score: prevHighScore });
     }
 
     syncLevelProgression(root, state);
@@ -4988,7 +5049,6 @@ var gemIcon = dailyChallenge
       state.wallSpawnsSinceBomb = 0;
     }
 
-    if (window.posthog) trackEvent('level_up', { level: nextLevel.id, score: state.score });
     syncHudUi(root, state);
   }
 
@@ -5028,6 +5088,11 @@ var gemIcon = dailyChallenge
     if (!mount) throw new Error('Missing #app');
     mount.innerHTML = '<div class="bm-stage" data-stage></div>';
     var root = mount.querySelector('[data-stage]');
+    if (window.posthog) {
+      trackEvent('app_loaded', {
+        is_paid: readUserIsPaid()
+      });
+    }
     var state = {
       isPaid: completeStripeReturnIfPresent() || readUserIsPaid(),
       screen: 'boot',
@@ -5155,6 +5220,12 @@ var gemIcon = dailyChallenge
         var play = root.querySelector('[data-play]');
         if (play) {
           play.addEventListener('click', function () {
+            if (window.posthog) {
+              trackEvent('home_cta_clicked', {
+                mode: 'classic'
+              });
+            }
+          
             spawnCenterUiBurst(root, 20, 2);
           
             window.setTimeout(function () {
@@ -5220,6 +5291,12 @@ var gemIcon = dailyChallenge
         var daily = root.querySelector('[data-daily]');
         if (daily) {
           daily.addEventListener('click', function () {
+            if (window.posthog) {
+              trackEvent('home_cta_clicked', {
+                mode: 'daily'
+              });
+            }
+          
             var savedDaily = readSavedGame('daily');
             var hasActiveSavedDaily = !!(
               savedDaily &&
