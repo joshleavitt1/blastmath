@@ -662,6 +662,7 @@ function openDailyCompletedLanding(state) {
 function openDailyPaywall(state) {
   if (window.posthog) {
     trackEvent('paywall_shown', {
+      version: 'launch_v1',
       mode: 'daily',
       reason: 'medium_locked'
     });
@@ -681,6 +682,7 @@ function openClassicPaywall(state, reason) {
   lockClassicPaywall();
   if (window.posthog) {
     trackEvent('paywall_shown', {
+      version: 'launch_v1',
       mode: 'classic',
       reason: state.classicPaywall.reason,
       score: state.score
@@ -765,6 +767,7 @@ function completeStripeReturnIfPresent() {
     localStorage.setItem('bm_user_valid', 'true');
     if (window.posthog) {
       trackEvent('payment_returned_success', {
+        version: 'launch_v1',
         source: 'stripe_redirect'
       });
     }
@@ -2375,6 +2378,7 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
 
       if (window.posthog) {
         trackEvent('daily_completed', {
+          version: 'launch_v1',
           puzzle_id: state.daily.puzzleId,
           challenge_id: state.daily.challengeId,
           tries: state.daily.tries,
@@ -3153,6 +3157,7 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
     
         if (window.posthog) {
           trackEvent('paywall_cta_clicked', {
+            version: 'launch_v1',
             mode: 'daily',
             price: 4.99
           });
@@ -3184,6 +3189,7 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
     
         if (window.posthog) {
           trackEvent('paywall_cta_clicked', {
+            version: 'launch_v1',
             mode: 'classic',
             price: 4.99,
             score: state.score
@@ -5090,6 +5096,7 @@ var gemIcon = dailyChallenge
     var root = mount.querySelector('[data-stage]');
     if (window.posthog) {
       trackEvent('app_loaded', {
+        version: 'launch_v1',
         is_paid: readUserIsPaid()
       });
     }
@@ -5222,6 +5229,7 @@ var gemIcon = dailyChallenge
           play.addEventListener('click', function () {
             if (window.posthog) {
               trackEvent('home_cta_clicked', {
+                version: 'launch_v1',
                 mode: 'classic'
               });
             }
@@ -5293,6 +5301,7 @@ var gemIcon = dailyChallenge
           daily.addEventListener('click', function () {
             if (window.posthog) {
               trackEvent('home_cta_clicked', {
+                version: 'launch_v1',
                 mode: 'daily'
               });
             }
