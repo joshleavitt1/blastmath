@@ -1,4 +1,8 @@
-window.trackEvent = window.trackEvent || function() {};
+window.trackEvent = function (eventName, props) {
+  if (window.posthog && typeof window.posthog.capture === 'function') {
+    window.posthog.capture(eventName, props || {});
+  }
+};
 window.primeResponsiveSfx = window.primeResponsiveSfx || function() {};
 
 (function () {
