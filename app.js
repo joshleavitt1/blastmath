@@ -3443,7 +3443,7 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
 
             '<div class="bm-daily-paywall__benefit">' +
               '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/trophy.svg" alt="" />' +
-              '<div class="bm-daily-paywall__benefit-text">Kids learn math through play</div>' +
+              '<div class="bm-daily-paywall__benefit-text">Builds real math skills</div>' +
             '</div>' +
 
             '<div class="bm-daily-paywall__benefit">' +
@@ -3492,7 +3492,7 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
 
             '<div class="bm-daily-paywall__benefit">' +
               '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/trophy.svg" alt="" />' +
-              '<div class="bm-daily-paywall__benefit-text">Kids learn math through play</div>' +
+              '<div class="bm-daily-paywall__benefit-text">Builds real math skills</div>' +
             '</div>' +
 
             '<div class="bm-daily-paywall__benefit">' +
