@@ -3807,7 +3807,7 @@ var gemIcon = dailyChallenge
 
       var rect = cellEl.getBoundingClientRect();
       var size = rect.width;
-      var pieces = 18;
+      var pieces = 20;
 
       if (comboStep >= 2) {
         pieces = Math.max(8, Math.round(pieces * 0.45));
@@ -3822,16 +3822,18 @@ var gemIcon = dailyChallenge
           ? boardRect.top + (size * 2.0) + Math.random() * (size * 0.10)
           : rect.top + (size * 0.10) + Math.random() * (size * 0.30);
 
-        var driftX = launchMode === 'life-loss'
-          ? (-size * 1.45) + Math.random() * (size * 2.9)
-          : (-size * 1.1) + Math.random() * (size * 2.2);
+          var driftX = launchMode === 'life-loss'
+          ? (-size * 1.65) + Math.random() * (size * 3.3)
+          : (-size * 1.45) + Math.random() * (size * 2.9);
+        
         var liftY = launchMode === 'life-loss'
           ? (size * 0.34) + Math.random() * (size * 0.36)
-          : (size * 0.82) + Math.random() * (size * 1.08);
-        var fallY = (size * 1.85) + Math.random() * (size * 2.15);
+          : (size * 0.92) + Math.random() * (size * 1.18);
+        
+        var fallY = (size * 1.95) + Math.random() * (size * 2.25);
         var rot = (-38 + Math.random() * 76).toFixed(1);
         var delay = Math.round(Math.random() * 24);
-        var duration = 880 + Math.round(Math.random() * 60);
+        var duration = 770 + Math.round(Math.random() * 55);
 
         var fragVariant = 1 + Math.floor(Math.random() * 4);
 

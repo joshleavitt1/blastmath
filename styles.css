@@ -97,6 +97,8 @@
   --bm-row-hud-h: calc(52px * var(--bm-ui-scale));
   --bm-row-score-h: calc(72px * var(--bm-ui-scale));
   --bm-row-hand-h: calc(160px * var(--bm-ui-scale));
+
+  --bm-drop-duration: 360ms;
 }
 
 * {
