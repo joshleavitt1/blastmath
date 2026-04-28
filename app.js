@@ -2025,36 +2025,11 @@ function getDailyPercentileText(state) {
 function fetchDailyPercentile(state, render) {
   if (!state || !state.daily || !state.daily.completed) return;
 
-  var challengeId = state.daily.challengeId;
-  var tries = state.daily.tries || 1;
-  var elapsedMs = Math.max(0, (state.daily.finishedAt || Date.now()) - (state.daily.startedAt || Date.now()));
-  var puzzleId = state.daily.puzzleId || getCurrentDailyPuzzleKey();
+  state.daily.percentile = getFallbackDailyPercentile(state);
 
-  fetch('/api/daily-percentile', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      puzzle_id: puzzleId,
-      challenge_id: challengeId,
-      tries: tries,
-      elapsed_ms: elapsedMs
-    })
-  })
-    .then(function (res) {
-      if (!res.ok) throw new Error('daily percentile failed');
-      return res.json();
-    })
-    .then(function (data) {
-      if (!data || typeof data.percentile !== 'number') return;
-
-      state.daily.percentile = data.percentile;
-      render();
-    })
-    .catch(function () {
-      state.daily.percentile = getFallbackDailyPercentile();
-    });
+  if (typeof render === 'function') {
+    render();
+  }
 }
 
 function createDailyStatsMap(stats) {
@@ -3452,25 +3427,28 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
         '</button>' +
   
         '<div class="bm-daily-paywall__content">' +
-  
-          '<div class="bm-daily-paywall__title">Finish Today’s Challenge</div>' +
+
+          '<div class="bm-paywall__header">' +
+            '<div class="bm-daily-paywall__title bm-classic-paywall__title">Get the full game</div>' +
+            '<div class="bm-daily-paywall__subtitle">Finish the daily challenge!</div>' +
+          '</div>' +
   
           '<img class="bm-daily-paywall__group-image" src="images/paywall/group.svg" alt="" />' +
   
           '<div class="bm-daily-paywall__benefits">' +
             '<div class="bm-daily-paywall__benefit">' +
-              '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/fire.svg" alt="" />' +
-              '<div class="bm-daily-paywall__benefit-text">Play medium & hard levels</div>' +
+              '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/ban.svg" alt="" />' +
+              '<div class="bm-daily-paywall__benefit-text">No ads, spam, or tracking</div>' +
             '</div>' +
-  
-            '<div class="bm-daily-paywall__benefit">' +
-              '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/play.svg" alt="" />' +
-              '<div class="bm-daily-paywall__benefit-text">Complete today’s challenge</div>' +
-            '</div>' +
-  
+
             '<div class="bm-daily-paywall__benefit">' +
               '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/trophy.svg" alt="" />' +
-              '<div class="bm-daily-paywall__benefit-text">Earn full rewards</div>' +
+              '<div class="bm-daily-paywall__benefit-text">Kids learn math through play</div>' +
+            '</div>' +
+
+            '<div class="bm-daily-paywall__benefit">' +
+              '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/shield.svg" alt="" />' +
+              '<div class="bm-daily-paywall__benefit-text">Screen time parents can trust</div>' +
             '</div>' +
           '</div>' +
   
@@ -3478,7 +3456,7 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
   
         '<div class="bm-daily-paywall__bottom">' +
           '<div class="bm-daily-paywall__legal">$4.99/month • Cancel anytime</div>' +
-          '<button class="bm-btn bm-btn--classic bm-daily-paywall__cta" type="button" data-daily-paywall-cta>Finish Challenge</button>' +
+          '<button class="bm-btn bm-btn--classic bm-daily-paywall__cta" type="button" data-daily-paywall-cta>Unlock Full Game</button>' +
         '</div>' +
   
       '</section>'
@@ -3495,8 +3473,11 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
         '</button>' +
   
         '<div class="bm-daily-paywall__content bm-classic-paywall__content">' +
-  
-          '<div class="bm-daily-paywall__title bm-classic-paywall__title">Keep Your Streak Alive</div>' +
+
+          '<div class="bm-paywall__header">' +
+            '<div class="bm-daily-paywall__title bm-classic-paywall__title">Get the full game</div>' +
+            '<div class="bm-daily-paywall__subtitle">Take your score to the next level!</div>' +
+          '</div>' +
   
           '<div class="bm-classic-paywall__score-card">' +
             '<img class="bm-classic-paywall__score-icon" src="images/paywall/crown.svg" alt="" />' +
@@ -3505,26 +3486,26 @@ function launchDailyChallenge(root, state, render, challengeId, options) {
   
           '<div class="bm-daily-paywall__benefits">' +
             '<div class="bm-daily-paywall__benefit">' +
-              '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/play.svg" alt="" />' +
-              '<div class="bm-daily-paywall__benefit-text">Play anytime without limits</div>' +
+              '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/ban.svg" alt="" />' +
+              '<div class="bm-daily-paywall__benefit-text">No ads, spam, or tracking</div>' +
             '</div>' +
-  
-            '<div class="bm-daily-paywall__benefit">' +
-              '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/fire.svg" alt="" />' +
-              '<div class="bm-daily-paywall__benefit-text">Gain powerful upgrades</div>' +
-            '</div>' +
-  
+
             '<div class="bm-daily-paywall__benefit">' +
               '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/trophy.svg" alt="" />' +
-              '<div class="bm-daily-paywall__benefit-text">Score higher and go further</div>' +
+              '<div class="bm-daily-paywall__benefit-text">Kids learn math through play</div>' +
+            '</div>' +
+
+            '<div class="bm-daily-paywall__benefit">' +
+              '<img class="bm-daily-paywall__benefit-icon" src="images/paywall/shield.svg" alt="" />' +
+              '<div class="bm-daily-paywall__benefit-text">Screen time parents can trust</div>' +
             '</div>' +
           '</div>' +
   
-        '</div>' +
+          '</div>' +
   
         '<div class="bm-daily-paywall__bottom">' +
           '<div class="bm-daily-paywall__legal">$4.99 / Month • Cancel Anytime</div>' +
-          '<button class="bm-btn bm-btn--classic bm-daily-paywall__cta" type="button" data-classic-paywall-cta>Keep Playing</button>' +
+          '<button class="bm-btn bm-btn--classic bm-daily-paywall__cta" type="button" data-classic-paywall-cta>Unlock Full Game</button>' +
         '</div>' +
   
       '</section>'
@@ -3834,7 +3815,7 @@ var gemIcon = dailyChallenge
 
       for (var i = 0; i < pieces; i++) {
         var frag = document.createElement('div');
-        var fragSize = Math.max(5, size * (0.16 + Math.random() * 0.16));
+        var fragSize = Math.max(8, size * (0.24 + Math.random() * 0.24));
 
         var startX = rect.left + (size * 0.12) + Math.random() * (size * 0.76);
         var startY = launchMode === 'life-loss'
