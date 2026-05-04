@@ -3,11 +3,11 @@
 :root {
   --bm-font: "Open Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --bm-ui-scale: 1;
-  --bm-bg-solid: #001B41;
   --bm-white: #ffffff;
-  --bm-board-fill: #001B41;
-  --bm-board-cell: #ffffff16;
-  --bm-cell-gap: 2px;
+  --bm-bg-solid: #8087A5;
+  --bm-board-fill: #000000;
+  --bm-board-cell: #ffffff32;
+  --bm-cell-gap: 4px;
   --bm-tile-radius: calc(6px * var(--bm-ui-scale));
   --bm-row-hud-h: calc(52px * var(--bm-ui-scale));
   --bm-row-score-h: calc(72px * var(--bm-ui-scale));
@@ -25,6 +25,7 @@
 
 html,
 body {
+  filter: saturate(115%);
   margin: 0;
   width: 100%;
   height: 100%;
@@ -125,8 +126,8 @@ button {
   margin: 0;
   background: transparent;
   box-shadow: none;
-  width: calc(52px * var(--bm-ui-scale));
-  height: calc(52px * var(--bm-ui-scale));
+  width: calc(38px * var(--bm-ui-scale));
+  height: calc(38px * var(--bm-ui-scale));
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -137,8 +138,8 @@ button {
 }
 
 .bm-hud-icon--settings {
-  width: calc(42px * var(--bm-ui-scale));
-  height: calc(42px * var(--bm-ui-scale));
+  width: calc(38px * var(--bm-ui-scale));
+  height: calc(38px * var(--bm-ui-scale));
 }
 
 .bm-score {
@@ -174,14 +175,14 @@ button {
   max-width: 400px;
   max-height: 400px;
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  grid-template-rows: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: repeat(7, minmax(0, 1fr));
   gap: var(--bm-cell-gap);
   margin: 0 auto;
   position: relative;
   z-index: 1;
   background: var(--bm-board-fill);
-  padding: 6px;
+  padding: 4px;
   border-radius: calc(8px * var(--bm-ui-scale));
 }
 
@@ -190,9 +191,10 @@ button {
   height: 100%;
   min-width: 0;
   min-height: 0;
-  background: var(--bm-board-cell);
-  border-radius: calc(8px * var(--bm-ui-scale));
+  background: transparent;
+  border-radius: calc(4px * var(--bm-ui-scale));
   position: relative;
+  overflow: visible;
 }
 
 .bm-cell.bm-hover-valid::after {
@@ -214,6 +216,11 @@ button {
   opacity: 0;
 }
 
+.bm-cell--wall {
+  border: none !important;
+  background: transparent; /* optional, cleaner */
+}
+
 .bm-gem-tile,
 .bm-neutral-block {
   width: 100%;
@@ -221,24 +228,59 @@ button {
   display: grid;
   place-items: center;
   position: relative;
-  border-radius: var(--bm-tile-radius);
+  border-radius: calc(4px * var(--bm-ui-scale));
   overflow: visible;
 }
 
 .bm-gem-tile {
-  background: none;
+  background: var(--bm-board-cell);
   box-shadow: none;
   border: none;
+  overflow: hidden;
+}
+
+.bm-gem-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 3;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.35) 0%,
+      rgba(255,255,255,0.18) 30%,
+      rgba(255,255,255,0.08) 55%,
+      rgba(255,255,255,0.02) 75%,
+      rgba(255,255,255,0.0) 100%
+    );
+
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  padding: 1px;
 }
 
 .bm-gem-tile__icon {
   position: relative;
   z-index: 2;
-  width: calc(32px * var(--bm-ui-scale));
-  height: calc(32px * var(--bm-ui-scale));
+  width: calc(36px * var(--bm-ui-scale));
+  height: calc(36px * var(--bm-ui-scale));
   object-fit: contain;
   display: block;
   pointer-events: none;
+
+  filter:
+  drop-shadow(1px 0 0 #000)
+  drop-shadow(-1px 0 0 #000)
+  drop-shadow(0 1px 0 #000)
+  drop-shadow(0 -1px 0 #000)
+  drop-shadow(0 calc(1px * var(--bm-ui-scale)) calc(2px * var(--bm-ui-scale)) rgba(0,0,0,.25));
 }
 
 .bm-neutral-block {
@@ -262,15 +304,17 @@ button {
   opacity: 1;
   pointer-events: none;
   z-index: 20;
+
   transform: translateZ(0);
-  filter: none;
-  animation: none;
   will-change: transform, opacity;
   backface-visibility: hidden;
+
+  transition: transform 90ms ease-out, opacity 90ms ease-out;
+  animation: bmPreviewPop 100ms ease-out;
 }
 
 @keyframes bmPreviewPop {
-  from { transform: scale(.9); opacity: .7; }
+  from { transform: scale(.96); opacity: .85; }
   to { transform: scale(1); opacity: 1; }
 }
 
@@ -297,6 +341,9 @@ button {
   width: max-content;
   height: max-content;
   margin: 0 auto;
+  background: #000;
+  padding: calc(5px * var(--bm-ui-scale));
+  border-radius: calc(7px * var(--bm-ui-scale));
 }
 
 .bm-piece.is-held {
@@ -313,15 +360,42 @@ button {
 
 .bm-mini {
   position: absolute;
-  width: calc(52px * var(--bm-ui-scale));
-  height: calc(52px * var(--bm-ui-scale));
+  width: calc(53px * var(--bm-ui-scale));
+  height: calc(53px * var(--bm-ui-scale));
   display: grid;
   place-items: center;
-  border-radius: calc(8px * var(--bm-ui-scale));
+  border-radius: calc(4px * var(--bm-ui-scale));
   overflow: hidden;
   background: var(--bm-board-cell);
-  border: none;
   box-shadow: none;
+  border: none;
+}
+
+.bm-mini::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 3;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.35) 0%,
+      rgba(255,255,255,0.18) 30%,
+      rgba(255,255,255,0.08) 55%,
+      rgba(255,255,255,0.02) 75%,
+      rgba(255,255,255,0.0) 100%
+    );
+
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  padding: 1px;
 }
 
 .bm-mini__gem-icon {
@@ -330,6 +404,12 @@ button {
   object-fit: contain;
   display: block;
   pointer-events: none;
+
+  filter:
+    drop-shadow(1px 0 0 #000)
+    drop-shadow(-1px 0 0 #000)
+    drop-shadow(0 1px 0 #000)
+    drop-shadow(0 -1px 0 #000);
 }
 
 .bm-drag-ghost {
@@ -345,6 +425,16 @@ button {
 
 .bm-drag-ghost.is-snapped-to-board {
   opacity: 0;
+}
+
+.bm-drag-ghost .bm-piece {
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.bm-drag-ghost .bm-piece__shape {
+  background: transparent !important;
 }
 
 .bm-drag-ghost .bm-piece {
@@ -382,15 +472,29 @@ button {
 
 .bm-gem-tile.bm-blast-pop,
 .bm-neutral-block.bm-blast-pop {
-  animation: bmBlastPopOutline 260ms cubic-bezier(.2,.9,.25,1) forwards;
+  animation: bmBlastVanish 180ms ease-out forwards;
   transform-origin: 50% 50%;
   z-index: 6;
-  overflow: visible;
+}
+
+@keyframes bmBlastVanish {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(.2);
+  }
 }
 
 .bm-gem-tile.bm-blast-pop .bm-gem-tile__icon,
 .bm-neutral-block.bm-blast-pop .bm-neutral-block__img {
-  opacity: 0;
+  opacity: 1;
 }
 
 @keyframes bmBlastPopOutline {
@@ -573,4 +677,20 @@ button {
   0% { transform: scale(1); }
   42% { transform: scale(1.18); }
   100% { transform: scale(1); }
+}
+
+.bm-board.is-dragging .bm-cell {
+  opacity: .8;
+}
+
+.bm-board.is-dragging .bm-cell.bm-hover-valid {
+  opacity: 1;
+}
+
+.bm-cell--blasting {
+  background: transparent !important;
+}
+
+.bm-cell--blasting::after {
+  display: none !important;
 }

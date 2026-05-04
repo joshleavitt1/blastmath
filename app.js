@@ -10,9 +10,9 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   var CONFIG = {
     baseWidth: 390,
     baseHeight: 844,
-    boardSize: 8,
+    boardSize: 7,
     handTileSize: 53,
-    handTileGap: 2,
+    handTileGap: 6,
     storageKey: 'blastmath.prototype.highscore',
     wallChanceOnRefill: 0.65,
     gravityMs: 430,
@@ -136,9 +136,16 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   }
 
   function makeWallCell(type) {
-    return { kind: 'wall', wallType: type || 'brick' };
+    var wallType;
+  
+    if (type) {
+      wallType = type;
+    } else {
+      wallType = Math.random() < 0.6 ? 'brick_1' : 'brick_2';
+    }
+  
+    return { kind: 'wall', wallType: wallType };
   }
-
   function turnRandomGemIntoWall() {
     var gemIndices = [];
   
@@ -149,7 +156,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     if (!gemIndices.length) return null;
   
     var index = gemIndices[Math.floor(Math.random() * gemIndices.length)];
-    state.board[index] = makeWallCell('brick');
+    state.board[index] = makeWallCell();
   
     return index;
   }
@@ -171,22 +178,14 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   
     var ratio = wallCount / board.length;
   
-    if (ratio >= 1.00) return 0.10;
-    if (ratio >= 0.875) return 0.20;
-    if (ratio >= 0.75) return 0.30;
-    if (ratio >= 0.625) return 0.40;
-    if (ratio >= 0.50) return 0.50;
-  
-    var target = 0.40;
-    var base = CONFIG.wallChanceOnRefill;
-    var strength = 0.9;
-  
-    var adjusted = base + ((target - ratio) * strength);
-  
-    if (adjusted < 0.50) adjusted = 0.50;
-    if (adjusted > 0.85) adjusted = 0.85;
-  
-    return adjusted;
+    // 📊 tiered buckets
+    if (ratio >= 0.60) return 0.00; // 60%+
+    if (ratio >= 0.50) return 0.10; // 50%
+    if (ratio >= 0.40) return 0.20; // 40%
+    if (ratio >= 0.30) return 0.30; // 30%
+    
+    // 0%–30%
+    return 0.40;
   }
 
   function randomGemType() {
@@ -202,19 +201,18 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     }
 
     var layout = [
-      ['diamond','brick','diamond','diamond','brick','hex','brick','hex'],
-      ['brick','brick','brick','star','star','hex','brick','hex'],
-      ['brick','star','star','brick','diamond','brick','brick','brick'],
-      ['diamond','star','diamond','star','star','hex','star','hex'],
-      ['diamond','brick','star','diamond','brick','diamond','brick','brick'],
-      ['hex','brick','brick','hex','brick','hex','diamond','star'],
-      ['diamond','brick','diamond','star','brick','diamond','hex','brick'],
-      ['brick','brick','star','diamond','brick','hex','hex','brick']
+      ['brick','brick','brick','star','star','star','brick'],
+      ['brick','star','star','brick','diamond','brick','brick'],
+      ['diamond','star','diamond','star','star','hex','star'],
+      ['diamond','brick','star','diamond','brick','diamond','brick'],
+      ['hex','brick','brick','hex','brick','hex','diamond'],
+      ['diamond','brick','diamond','star','brick','diamond','hex'],
+      ['brick','brick','star','diamond','brick','hex','hex']
     ];
 
     layout.forEach(function (row, y) {
       row.forEach(function (value, x) {
-        put(x, y, value === 'brick' ? makeWallCell('brick') : makeGemCell(value));
+        put(x, y, value === 'brick' ? makeWallCell() : makeGemCell(value));
       });
     });
 
@@ -479,11 +477,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
 
   function applyBlast(board, result) {
     result.blastIndices.forEach(function (index) {
-      if (isWallCell(board[index])) {
-        board[index] = makeGemCell();
-      } else {
-        board[index] = null;
-      }
+      board[index] = null;
     });
   }
 
@@ -502,8 +496,8 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       var emptyCount = size - existing.length;
 
       for (var spawnY = 0; spawnY < emptyCount; spawnY++) {
-        var wallChance = getAdaptiveWallChance(board);
-        var spawn = Math.random() < wallChance ? makeWallCell('brick') : makeGemCell();
+        var wallChance = state.chainWallChance == null ? getAdaptiveWallChance(board) : state.chainWallChance;
+        var spawn = Math.random() < wallChance ? makeWallCell() : makeGemCell();
         next[(spawnY * size) + x] = spawn;
         moved.push({ x: x, fromY: spawnY - emptyCount, toY: spawnY });
       }
@@ -546,7 +540,8 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       message: '',
       chainScore: 0,
       chainMessage: '',
-      pendingWallPenalty: false
+      pendingWallPenalty: false,
+      chainWallChance: null,
     };
   }
 
@@ -632,9 +627,9 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
 
   function renderBoard() {
     return state.board.map(function (cell, index) {
-      var cellClass = 'bm-cell';
-      var anim = animStyleFor(index, state.animMap);
       var blasting = state.blastIndices.indexOf(index) !== -1;
+      var cellClass = 'bm-cell' + (blasting ? ' bm-cell--blasting' : '');
+      var anim = animStyleFor(index, state.animMap);
       var extraClass = anim.className + (blasting ? ' bm-blast-pop' : '');
 
       if (!cell) {
@@ -642,11 +637,11 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       }
 
       if (isWallCell(cell)) {
-        return '<div class="' + cellClass + '" data-cell-index="' + index + '">' +
-          '<div class="bm-neutral-block bm-neutral-block--svg' + extraClass + '"' + anim.style + '>' +
-            '<img class="bm-neutral-block__img" src="' + TILE_PATH + 'brick.svg" alt="" />' +
-          '</div>' +
-        '</div>';
+        return '<div class="' + cellClass + ' bm-cell--wall" data-cell-index="' + index + '">' +
+        '<div class="bm-neutral-block bm-neutral-block--svg' + extraClass + '"' + anim.style + '>' +
+          '<img class="bm-neutral-block__img" src="' + TILE_PATH + escapeHtml(cell.wallType) + '.svg" alt="" />' +
+        '</div>' +
+      '</div>';
       }
 
       return '<div class="' + cellClass + '" data-cell-index="' + index + '">' +
@@ -771,6 +766,9 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
 
     cacheBoardMetrics();
 
+    var board = rootEl.querySelector('[data-board]');
+if (board) board.classList.add('is-dragging');
+
     var pieceEl = slot.querySelector('[data-piece]');
     if (pieceEl) pieceEl.classList.add('is-held');
 
@@ -826,6 +824,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     var key = anchor
     ? anchor.placed.map(function (cell) { return cell.index + ':' + cell.gemType; }).join('|')
     : '';
+    if (!boardMetrics) return;
     if (key === drag.lastAnchorKey) return;
 
     drag.lastAnchorKey = key;
@@ -893,6 +892,9 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       if (pieceEl) pieceEl.classList.remove('is-held');
     }
 
+    var board = rootEl.querySelector('[data-board]');
+if (board) board.classList.remove('is-dragging');
+
     drag = null;
     latestPointer = null;
     if (!keepPreview) clearPreview();
@@ -915,7 +917,9 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       var toIndex = (move.toY * state.boardSize) + move.x;
       map[toIndex] = {
         type: 'drop-land',
-        distance: (move.toY - move.fromY) * step,
+        distance: move.fromY < 0
+        ? (move.toY + state.boardSize) * step
+        : (move.toY - move.fromY) * step,
         duration: CONFIG.gravityMs
       };
     });
@@ -943,7 +947,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       var previewBlast = classifyBlastPhase(state.board, state.boardSize, 1);
     
       state.pendingWallPenalty = !previewBlast.hasBlast || previewBlast.totalGroups <= 1;
-    
+      state.chainWallChance = getAdaptiveWallChance(state.board);
       runBlastChain(1);
     }, CONFIG.placeResolveDelayMs);
   }
@@ -1026,6 +1030,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   }
 
   function finishResolveFinal() {
+    state.chainWallChance = null;
     state.comboStep = 0;
     state.resolving = false;
   
