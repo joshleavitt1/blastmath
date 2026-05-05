@@ -343,7 +343,8 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   function generateHand(board, size) {
     return [
       generatePiece(board, size, ['single']),
-      generatePiece(board, size, ['h2', 'v2']),
+      generatePiece(board, size, ['single']),
+      generatePiece(board, size, ['single']),
       generatePiece(board, size, ['single'])
     ];
   }

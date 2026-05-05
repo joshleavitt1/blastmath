@@ -4,7 +4,7 @@
   --bm-font: "Open Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --bm-ui-scale: 1;
   --bm-white: #ffffff;
-  --bm-bg-solid: #8087A5;
+  --bm-bg-solid: #7C85A5;
   --bm-board-fill: #000000;
   --bm-board-cell: #ffffff32;
   --bm-cell-gap: 4px;
@@ -320,10 +320,10 @@ button {
 
 .bm-hand {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   align-items: center;
-  gap: calc(12px * var(--bm-ui-scale));
-  height: var(--bm-row-hand-h);
+  gap: calc(8px * var(--bm-ui-scale));
+  height: calc(96px * var(--bm-ui-scale));
   width: 100%;
 }
 
