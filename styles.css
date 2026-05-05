@@ -443,16 +443,14 @@ button {
 
 .bm-gem-tile.bm-place-pop,
 .bm-neutral-block.bm-place-pop {
-  animation: bmPlacePop 240ms cubic-bezier(.16,1.06,.22,1);
+  animation: bmPlacePop 120ms cubic-bezier(.16,1.06,.22,1);
   transform-origin: 50% 50%;
   z-index: 3;
 }
 
 @keyframes bmPlacePop {
-  0% { transform: scale(.92); filter: brightness(1.08) saturate(1.05); }
-  42% { transform: scale(1.12); filter: brightness(1.20) saturate(1.16); }
-  74% { transform: scale(.985); filter: brightness(1.03) saturate(1.02); }
-  100% { transform: scale(1); filter: brightness(1) saturate(1); }
+  0% { transform: translateZ(0) scale(.98); filter: brightness(1.25); }
+  100% { transform: translateZ(0) scale(1); filter: brightness(1); }
 }
 
 .bm-gem-tile.bm-drop-land,
@@ -472,23 +470,30 @@ button {
 
 .bm-gem-tile.bm-blast-pop,
 .bm-neutral-block.bm-blast-pop {
-  animation: bmBlastVanish 180ms ease-out forwards;
+  animation: bmBlastVanish 150ms linear forwards;
   transform-origin: 50% 50%;
   z-index: 6;
+  will-change: opacity, filter;
+  backface-visibility: hidden;
 }
 
 @keyframes bmBlastVanish {
   0% {
     opacity: 1;
-    transform: scale(1);
+    transform: translateZ(0) scale(1);
+    filter: brightness(1);
   }
-  60% {
+
+  45% {
     opacity: 1;
-    transform: scale(1.08);
+    transform: translateZ(0) scale(1);
+    filter: brightness(1.75);
   }
+
   100% {
     opacity: 0;
-    transform: scale(.2);
+    transform: translateZ(0) scale(1);
+    filter: brightness(2.1);
   }
 }
 
@@ -693,4 +698,82 @@ button {
 
 .bm-cell--blasting::after {
   display: none !important;
+}
+
+.bm-board--chain-active {
+  box-shadow:
+    0 0 calc(18px * var(--bm-ui-scale)) rgba(255, 194, 35, .35),
+    0 0 calc(42px * var(--bm-ui-scale)) rgba(255, 156, 0, .18);
+}
+
+.bm-cell--chain-react .bm-gem-tile,
+.bm-cell--chain-react .bm-neutral-block {
+  animation: bmChainReactPulse 190ms cubic-bezier(.16, 1.1, .22, 1);
+  z-index: 12;
+}
+
+.bm-cell--chain-react .bm-gem-tile__icon {
+  filter:
+    drop-shadow(1px 0 0 #000)
+    drop-shadow(-1px 0 0 #000)
+    drop-shadow(0 1px 0 #000)
+    drop-shadow(0 -1px 0 #000)
+    drop-shadow(0 0 calc(10px * var(--bm-ui-scale)) rgba(255, 226, 80, .95))
+    drop-shadow(0 0 calc(18px * var(--bm-ui-scale)) rgba(255, 149, 0, .65));
+}
+
+@keyframes bmChainReactPulse {
+  0% {
+    transform: scale(1);
+    filter: brightness(1) saturate(1);
+  }
+
+  38% {
+    transform: scale(1.14);
+    filter: brightness(1.85) saturate(1.35);
+  }
+
+  100% {
+    transform: scale(1);
+    filter: brightness(1) saturate(1);
+  }
+}
+
+.bm-chain-spark-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 18500;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.bm-chain-spark {
+  position: absolute;
+  width: var(--bm-chain-spark-size, 6px);
+  height: var(--bm-chain-spark-size, 6px);
+  border-radius: 999px;
+  background: #fff7a8;
+  box-shadow:
+    0 0 calc(7px * var(--bm-ui-scale)) rgba(255, 244, 120, .95),
+    0 0 calc(16px * var(--bm-ui-scale)) rgba(255, 164, 0, .75);
+  opacity: 0;
+  transform: translate3d(-50%, -50%, 0) scale(.6);
+  animation: bmChainSparkPop 520ms ease-out forwards;
+}
+
+@keyframes bmChainSparkPop {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(.4);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1.35);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(.3);
+  }
 }

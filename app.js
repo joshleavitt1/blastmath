@@ -15,13 +15,13 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     handTileGap: 6,
     storageKey: 'blastmath.prototype.highscore',
     wallChanceOnRefill: 0.65,
-    gravityMs: 430,
-    blastBreathMs: 260,
-    chainDelayMs: 300,
-    placeResolveDelayMs: 120
+    gravityMs: 330,
+    blastBreathMs: 80,
+    chainDelayMs: 60,
+    placeResolveDelayMs: 35
   };
 
-  var GEM_TYPES = ['star', 'diamond', 'hex'];
+  var GEM_TYPES = ['star', 'diamond', 'pent'];
   var TILE_PATH = 'images/tiles/';
 
   var SFX_VOLUME = {
@@ -203,11 +203,11 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     var layout = [
       ['brick','brick','brick','star','star','star','brick'],
       ['brick','star','star','brick','diamond','brick','brick'],
-      ['diamond','star','diamond','star','star','hex','star'],
+      ['diamond','star','diamond','star','star','pent','star'],
       ['diamond','brick','star','diamond','brick','diamond','brick'],
-      ['hex','brick','brick','hex','brick','hex','diamond'],
-      ['diamond','brick','diamond','star','brick','diamond','hex'],
-      ['brick','brick','star','diamond','brick','hex','hex']
+      ['pent','brick','brick','pent','brick','pent','diamond'],
+      ['diamond','brick','diamond','star','brick','diamond','pent'],
+      ['brick','brick','star','diamond','brick','pent','pent']
     ];
 
     layout.forEach(function (row, y) {
@@ -401,6 +401,111 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     if (y > 0) out.push(index - size);
     if (y < size - 1) out.push(index + size);
     return out;
+  }
+
+  function buildChainReactionIndices(result) {
+    var size = state.boardSize;
+    var start = result.gemBlastIndices && result.gemBlastIndices.length
+      ? result.gemBlastIndices
+      : result.blastIndices;
+  
+    var visited = new Set();
+    var queue = start.map(function (index) {
+      return { index: index, depth: 0 };
+    });
+  
+    var out = [];
+  
+    while (queue.length) {
+      var item = queue.shift();
+      if (visited.has(item.index)) continue;
+  
+      visited.add(item.index);
+  
+      if (state.board[item.index]) {
+        out.push({
+          index: item.index,
+          depth: item.depth
+        });
+      }
+  
+      getNeighborIndices(item.index, size).forEach(function (neighbor) {
+        if (!visited.has(neighbor) && state.board[neighbor] && item.depth < 3) {
+          queue.push({
+            index: neighbor,
+            depth: item.depth + 1
+          });
+        }
+      });
+    }
+  
+    return out;
+  }
+  
+  function triggerChainReaction(result, comboStep) {
+    if (comboStep < 2) return 0;
+  
+    var board = rootEl.querySelector('[data-board]');
+    if (!board) return 0;
+  
+    var chain = buildChainReactionIndices(result);
+    if (!chain.length) return 0;
+  
+    board.classList.add('bm-board--chain-active');
+  
+    chain.forEach(function (item) {
+      var delay = item.depth * 45;
+  
+      window.setTimeout(function () {
+        var cell = rootEl.querySelector('[data-cell-index="' + item.index + '"]');
+        if (!cell) return;
+  
+        cell.classList.add('bm-cell--chain-react');
+        spawnChainSpark(item.index);
+  
+        window.setTimeout(function () {
+          cell.classList.remove('bm-cell--chain-react');
+        }, 190);
+      }, delay);
+    });
+  
+    var totalMs = 260 + (Math.min(3, Math.max.apply(null, chain.map(function (item) {
+      return item.depth;
+    }))) * 70);
+  
+    window.setTimeout(function () {
+      board.classList.remove('bm-board--chain-active');
+    }, totalMs + 80);
+  
+    return totalMs;
+  }
+  
+  function spawnChainSpark(index) {
+    var layer = document.body.querySelector('.bm-chain-spark-layer');
+  
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'bm-chain-spark-layer';
+      document.body.appendChild(layer);
+    }
+  
+    var center = getCellCenter(index);
+    var spark = document.createElement('div');
+  
+    spark.className = 'bm-chain-spark';
+    spark.style.left = center.x + 'px';
+    spark.style.top = center.y + 'px';
+    spark.style.setProperty('--bm-chain-spark-size', Math.max(5, center.size * 0.13) + 'px');
+  
+    layer.appendChild(spark);
+  
+    window.setTimeout(function () {
+      if (spark.parentNode) spark.parentNode.removeChild(spark);
+  
+      if (!layer.querySelector('.bm-chain-spark') && layer.parentNode) {
+        layer.parentNode.removeChild(layer);
+      }
+    }, 520);
   }
 
   function classifyBlastPhase(board, size, comboStep) {
@@ -968,9 +1073,11 @@ if (board) board.classList.remove('is-dragging');
 
     spawnBlastConfetti(result);
     playSfx(comboStep >= 2 ? 'combo' : 'blast');
-
+    
     renderApp();
-
+    
+    var chainReactionMs = triggerChainReaction(result, comboStep);
+    
     window.setTimeout(function () {
       applyBlast(state.board, result);
       state.blastIndices = [];
@@ -985,14 +1092,14 @@ if (board) board.classList.remove('is-dragging');
 
         window.setTimeout(function () {
           state.animMap = null;
-          renderApp();
 
           window.setTimeout(function () {
+            renderApp();
             runBlastChain(comboStep + 1);
           }, CONFIG.chainDelayMs);
         }, CONFIG.gravityMs + 30);
       }, CONFIG.blastBreathMs);
-    }, 250);
+    }, comboStep >= 2 ? Math.max(260, chainReactionMs + 20) : 190);
   }
 
   function finishResolve() {
