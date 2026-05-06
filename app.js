@@ -15,13 +15,14 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     handTileGap: 6,
     storageKey: 'blastmath.prototype.highscore',
     wallChanceOnRefill: 0.65,
-    gravityMs: 330,
-    blastBreathMs: 80,
-    chainDelayMs: 60,
+    gravityMs: 460,
+    blastBreathMs: 70,
+    chainDelayMs: 55,
     placeResolveDelayMs: 35
   };
 
   var GEM_TYPES = ['star', 'diamond', 'pent'];
+  var HAND_GEM_TYPES = ['diamond', 'pent', 'star', 'hex'];
   var TILE_PATH = 'images/tiles/';
 
   var SFX_VOLUME = {
@@ -135,6 +136,10 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     return { kind: 'gem', gemType: type };
   }
 
+  function isBombGem(cell) {
+    return isGemCell(cell) && cell.gemType === 'hex';
+  }
+
   function makeWallCell(type) {
     var wallType;
   
@@ -242,6 +247,17 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     };
   }
 
+  function makeSingleGemPiece(gemType, slotIndex) {
+    return {
+      id: 'single-' + gemType + '-' + slotIndex + '-' + Date.now(),
+      shapeId: 'single',
+      rank: 1,
+      width: 1,
+      height: 1,
+      cells: [{ x: 0, y: 0, kind: 'gem', gemType: gemType }]
+    };
+  }
+
   function getNearMatchGemTypes(board, size) {
     var weighted = [];
 
@@ -295,7 +311,11 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       if (x < 0 || x >= size || y < 0 || y >= size) return null;
 
       var index = (y * size) + x;
-      if (!isGemCell(board[index])) return null;
+
+      // Normal hand tiles can only replace gems.
+      // Hex bomb can be placed over ANY board tile (gem or wall).
+      if (source.gemType !== 'hex' && !isGemCell(board[index])) return null;
+      if (source.gemType === 'hex' && !board[index]) return null;
 
       placed.push({
         index: index,
@@ -341,12 +361,10 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   }
 
   function generateHand(board, size) {
-    return [
-      generatePiece(board, size, ['single']),
-      generatePiece(board, size, ['single']),
-      generatePiece(board, size, ['single']),
-      generatePiece(board, size, ['single'])
-    ];
+    return HAND_GEM_TYPES.map(function (gemType, index) {
+      var piece = makeSingleGemPiece(gemType, index);
+      return hasLegalPlacement(board, size, piece) ? piece : null;
+    });
   }
 
   function findBlastGroups(board, size) {
@@ -403,6 +421,24 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     return out;
   }
 
+  function getSquareBlastIndices(centerIndex, size) {
+    var cx = centerIndex % size;
+    var cy = Math.floor(centerIndex / size);
+    var out = [];
+
+    for (var dy = -1; dy <= 1; dy++) {
+      for (var dx = -1; dx <= 1; dx++) {
+        var x = cx + dx;
+        var y = cy + dy;
+        if (x >= 0 && x < size && y >= 0 && y < size) {
+          out.push((y * size) + x);
+        }
+      }
+    }
+
+    return out;
+  }
+
   function buildChainReactionIndices(result) {
     var size = state.boardSize;
     var start = result.gemBlastIndices && result.gemBlastIndices.length
@@ -442,42 +478,10 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     return out;
   }
   
-  function triggerChainReaction(result, comboStep) {
-    if (comboStep < 2) return 0;
-  
-    var board = rootEl.querySelector('[data-board]');
-    if (!board) return 0;
-  
-    var chain = buildChainReactionIndices(result);
-    if (!chain.length) return 0;
-  
-    board.classList.add('bm-board--chain-active');
-  
-    chain.forEach(function (item) {
-      var delay = item.depth * 45;
-  
-      window.setTimeout(function () {
-        var cell = rootEl.querySelector('[data-cell-index="' + item.index + '"]');
-        if (!cell) return;
-  
-        cell.classList.add('bm-cell--chain-react');
-        spawnChainSpark(item.index);
-  
-        window.setTimeout(function () {
-          cell.classList.remove('bm-cell--chain-react');
-        }, 190);
-      }, delay);
-    });
-  
-    var totalMs = 260 + (Math.min(3, Math.max.apply(null, chain.map(function (item) {
-      return item.depth;
-    }))) * 70);
-  
-    window.setTimeout(function () {
-      board.classList.remove('bm-board--chain-active');
-    }, totalMs + 80);
-  
-    return totalMs;
+  function triggerChainReaction(result, comboStep, isFinalBlast) {
+    // Chain flash/pulse/spark animation removed entirely.
+    // Blasts still resolve, score, confetti, and gravity still run normally.
+    return 0;
   }
   
   function spawnChainSpark(index) {
@@ -505,7 +509,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       if (!layer.querySelector('.bm-chain-spark') && layer.parentNode) {
         layer.parentNode.removeChild(layer);
       }
-    }, 520);
+    }, 760);
   }
 
   function classifyBlastPhase(board, size, comboStep) {
@@ -513,6 +517,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     var blastSet = new Set();
     var gemBlastSet = new Set();
     var wallSet = new Set();
+    var bombSet = new Set();
     var horizontalGroups = 0;
     var verticalGroups = 0;
 
@@ -526,8 +531,21 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       });
     });
 
+    if (state.pendingBombIndices && state.pendingBombIndices.length) {
+      state.pendingBombIndices.forEach(function (bombIndex) {
+        getSquareBlastIndices(bombIndex, size).forEach(function (targetIndex) {
+          if (board[targetIndex]) {
+            blastSet.add(targetIndex);
+            if (isGemCell(board[targetIndex])) gemBlastSet.add(targetIndex);
+            if (isWallCell(board[targetIndex])) wallSet.add(targetIndex);
+          }
+        });
+        bombSet.add(bombIndex);
+      });
+    }
+
     if (!blastSet.size) {
-      return { hasBlast: false, blastIndices: [], gemBlastIndices: [], wallRevealIndices: [] };
+      return { hasBlast: false, blastIndices: [], gemBlastIndices: [], wallRevealIndices: [], bombIndices: [] };
     }
 
     Array.from(gemBlastSet).forEach(function (index) {
@@ -546,8 +564,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
 
     if (comboStep >= 2) {
       var comboDisplay = Math.min(comboStep, 20);
-      label = 'Combo ' + comboDisplay + 'x';
-    
+
       if (comboStep === 2) scoreValue = 300;
       else if (comboStep === 3) scoreValue = 550;
       else if (comboStep === 4) scoreValue = 900;
@@ -574,6 +591,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       blastIndices: Array.from(blastSet),
       gemBlastIndices: Array.from(gemBlastSet),
       wallRevealIndices: Array.from(wallSet),
+      bombIndices: Array.from(bombSet),
       totalGroups: totalGroups,
       clearedCount: clearedCount,
       label: label,
@@ -646,8 +664,11 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       message: '',
       chainScore: 0,
       chainMessage: '',
+      chainBlastCount: 0,
+      maxChainBlastCount: 0,
       pendingWallPenalty: false,
       chainWallChance: null,
+      pendingBombIndices: []
     };
   }
 
@@ -760,7 +781,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
 
   function renderApp() {
     syncUiScale();
-
+  
     rootEl.innerHTML = '' +
       '<section class="bm-screen bm-game" data-game>' +
         '<div class="bm-hud">' +
@@ -786,12 +807,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
           return '<div class="bm-hand-slot" data-hand-slot-index="' + index + '">' + renderPiece(piece) + '</div>';
         }).join('') + '</div>' +
       '</section>';
-
-      if (state.message) {
-        showBoardMessage(state.message, 'combo');
-        state.message = '';
-      }
-
+  
     bindGame();
     state.animMap = null;
   }
@@ -948,6 +964,10 @@ if (board) board.classList.add('is-dragging');
     board.querySelectorAll('.bm-hover-valid').forEach(function (node) {
       node.classList.remove('bm-hover-valid');
     });
+
+    board.querySelectorAll('.bm-hover-bomb-zone').forEach(function (node) {
+      node.classList.remove('bm-hover-bomb-zone');
+    });
   }
 
   function renderPreview(anchor) {
@@ -959,6 +979,16 @@ if (board) board.classList.add('is-dragging');
       if (!cellEl) return;
 
       cellEl.classList.add('bm-hover-valid');
+      if (cell.gemType === 'hex') {
+        getSquareBlastIndices(cell.index, state.boardSize).forEach(function (targetIndex) {
+          // Keep the placed bomb itself clean/readable.
+          // Only the surrounding blast radius gets the red danger hover.
+          if (targetIndex === cell.index) return;
+
+          var targetEl = rootEl.querySelector('[data-cell-index="' + targetIndex + '"]');
+          if (targetEl) targetEl.classList.add('bm-hover-bomb-zone');
+        });
+      }
       var preview = document.createElement('div');
       preview.className = 'bm-gem-tile bm-preview-tile';
       preview.innerHTML = '<img class="bm-gem-tile__icon" src="' + TILE_PATH + escapeHtml(cell.gemType) + '.svg" alt="" />';
@@ -1041,6 +1071,10 @@ if (board) board.classList.remove('is-dragging');
       state.board[cell.index] = makeGemCell(cell.gemType);
     });
 
+    state.pendingBombIndices = placedCells
+      .filter(function (cell) { return cell.gemType === 'hex'; })
+      .map(function (cell) { return cell.index; });
+
     state.hand[slotIndex] = null;
     state.moveCount++;
 
@@ -1068,15 +1102,24 @@ if (board) board.classList.remove('is-dragging');
 
     state.comboStep = comboStep;
     state.blastIndices = result.blastIndices.slice();
-    if (result.label) state.chainMessage = result.label;
-    state.chainScore += result.scoreValue;
+    state.pendingBombIndices = [];
+    addScore(result.scoreValue);
+
+    state.chainBlastCount = comboStep;
+    state.maxChainBlastCount = Math.max(state.maxChainBlastCount || 0, comboStep);
 
     spawnBlastConfetti(result);
     playSfx(comboStep >= 2 ? 'combo' : 'blast');
     
+    var nextBoard = state.board.slice();
+    applyBlast(nextBoard, result);
+    applyGravityWithRefill(nextBoard, state.boardSize);
+    var nextResult = classifyBlastPhase(nextBoard, state.boardSize, comboStep + 1);
+    var isFinalBlast = !nextResult.hasBlast;
+
     renderApp();
     
-    var chainReactionMs = triggerChainReaction(result, comboStep);
+    var chainReactionMs = triggerChainReaction(result, comboStep, isFinalBlast);
     
     window.setTimeout(function () {
       applyBlast(state.board, result);
@@ -1094,28 +1137,36 @@ if (board) board.classList.remove('is-dragging');
           state.animMap = null;
 
           window.setTimeout(function () {
-            renderApp();
             runBlastChain(comboStep + 1);
           }, CONFIG.chainDelayMs);
-        }, CONFIG.gravityMs + 30);
+        }, CONFIG.gravityMs + 35);
       }, CONFIG.blastBreathMs);
-    }, comboStep >= 2 ? Math.max(260, chainReactionMs + 20) : 190);
+    }, comboStep >= 2 ? 210 : 170);
   }
 
   function finishResolve() {
-    if (state.chainScore > 0) {
-      addScore(state.chainScore);
+    var finalChainCount = state.maxChainBlastCount || 0;
   
-      if (state.chainMessage) {
-        state.message = state.chainMessage;
-      }
+    if (finalChainCount >= 2) {
+      showBoardMessage('BLAST x' + finalChainCount, 'chain');
+  
+      window.setTimeout(function () {
+        continueFinishResolveAfterChainPayoff();
+      }, 520);
+  
+      return;
     }
   
-    var shouldSpawnWall = !state.chainMessage;
+    continueFinishResolveAfterChainPayoff();
+  }
   
-    // reset BEFORE wall logic so next turn is clean
+  function continueFinishResolveAfterChainPayoff() {
+    var shouldSpawnWall = true;
+  
     state.chainScore = 0;
     state.chainMessage = '';
+    state.chainBlastCount = 0;
+    state.maxChainBlastCount = 0;
   
     if (shouldSpawnWall) {
       var wallIndex = turnRandomGemIntoWall();
@@ -1139,6 +1190,7 @@ if (board) board.classList.remove('is-dragging');
 
   function finishResolveFinal() {
     state.chainWallChance = null;
+    state.pendingBombIndices = [];
     state.comboStep = 0;
     state.resolving = false;
   
@@ -1170,8 +1222,14 @@ if (board) board.classList.remove('is-dragging');
   
     animateScore(from, to, 420);
   }
+  var scoreAnimFrame = 0;
 
   function animateScore(from, to, duration) {
+    if (scoreAnimFrame) {
+      cancelAnimationFrame(scoreAnimFrame);
+      scoreAnimFrame = 0;
+    }
+  
     var start = performance.now();
   
     function tick(now) {
@@ -1187,21 +1245,24 @@ if (board) board.classList.remove('is-dragging');
       }
   
       if (t < 1) {
-        requestAnimationFrame(tick);
+        scoreAnimFrame = requestAnimationFrame(tick);
       } else {
+        scoreAnimFrame = 0;
         state.displayScore = to;
+  
         if (scoreEl) {
           scoreEl.textContent = to;
           scoreEl.classList.remove('is-score-counting');
           scoreEl.classList.add('is-score-hit');
+  
           setTimeout(function () {
             scoreEl.classList.remove('is-score-hit');
-          }, 220);
+          }, 180);
         }
       }
     }
   
-    requestAnimationFrame(tick);
+    scoreAnimFrame = requestAnimationFrame(tick);
   }
 
   function getCellCenter(index) {
@@ -1272,6 +1333,51 @@ if (board) board.classList.remove('is-dragging');
     var bottomText = parts.slice(1).join(' ') || '';
   
     var msg = document.createElement('div');
+
+    for (var i = 0; i < 16; i++) {
+      var debris = document.createElement('div');
+    
+      debris.style.position = 'absolute';
+      debris.style.left = '50%';
+      debris.style.top = '50%';
+    
+      debris.style.width = (10 + Math.random() * 14) + 'px';
+      debris.style.height = (4 + Math.random() * 8) + 'px';
+    
+      debris.style.borderRadius = '2px';
+    
+      debris.style.background =
+        Math.random() < 0.5
+          ? 'linear-gradient(135deg,#ffcc55,#ff7a00)'
+          : 'linear-gradient(135deg,#8b8f98,#d3d7df)';
+    
+      var dx = (Math.random() - 0.5) * 180;
+      var dy = (Math.random() - 0.5) * 120;
+    
+      debris.animate([
+        {
+          opacity: 0,
+          transform: 'translate(-50%,-50%) scale(.4)'
+        },
+        {
+          opacity: 1,
+          transform:
+            'translate(calc(-50% + ' + (dx * .5) + 'px), calc(-50% + ' + (dy * .3) + 'px)) scale(1.1)'
+        },
+        {
+          opacity: 0,
+          transform:
+            'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px)) scale(.9)'
+        }
+      ], {
+        duration: 700 + Math.random() * 220,
+        easing: 'cubic-bezier(.16,.84,.24,1)',
+        fill: 'forwards'
+      });
+    
+      msg.appendChild(debris);
+    }
+
     msg.className = 'bm-board-message';
     msg.style.left = x + 'px';
     msg.style.top = y + 'px';
@@ -1302,7 +1408,7 @@ if (board) board.classList.remove('is-dragging');
   
     window.setTimeout(function () {
       if (msg.parentNode) msg.parentNode.removeChild(msg);
-    }, 2000);
+    }, 1320);
   }
 
   function boot() {
