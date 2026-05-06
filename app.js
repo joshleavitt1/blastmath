@@ -895,9 +895,21 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   }
 
   function getPieceMetrics(piece) {
-    var scale = getScale();
-    var cellSize = CONFIG.handTileSize * scale;
-    var gap = CONFIG.handTileGap * scale;
+    var bm = boardMetrics || cacheBoardMetrics();
+  
+    if (!bm) {
+      return {
+        cellSize: 48,
+        gap: 4,
+        step: 52,
+        width: 48,
+        height: 48
+      };
+    }
+  
+    var cellSize = bm.cellSize;
+    var gap = bm.gap;
+  
     return {
       cellSize: cellSize,
       gap: gap,

@@ -72,6 +72,8 @@ button {
 }
 
 .bm-game {
+  --bm-board-size-live: min(calc(100vw - 24px), 400px);
+  --bm-board-tile-size: calc((var(--bm-board-size-live) - (var(--bm-cell-gap) * 6) - 8px) / 7);
   width: 100%;
   max-width: 400px;
   height: 100%;
@@ -169,7 +171,6 @@ button {
 }
 
 .bm-board {
-  --bm-board-size-live: min(calc(100vw - 24px), 400px);
   width: var(--bm-board-size-live);
   height: var(--bm-board-size-live);
   max-width: 400px;
@@ -425,13 +426,9 @@ button {
 }
 
 .bm-hand-slot {
-  width: 61px;
-  height: 61px;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   flex: 0 0 auto;
 }
 
@@ -439,11 +436,16 @@ button {
   position: relative;
   display: inline-grid;
   place-items: center;
+
   width: max-content;
   height: max-content;
+
   margin: 0 auto;
+
   background: #000;
+
   padding: 4px;
+
   border-radius: 6px;
 }
 
@@ -461,13 +463,19 @@ button {
 
 .bm-mini {
   position: absolute;
-  width: 53px;
-  height: 53px;
+
+  width: var(--bm-board-tile-size);
+  height: var(--bm-board-tile-size);
+
   display: grid;
   place-items: center;
+
   border-radius: calc(4px * var(--bm-ui-scale));
+
   overflow: hidden;
+
   background: var(--bm-board-cell);
+
   box-shadow: none;
   border: none;
 }
@@ -500,8 +508,8 @@ button {
 }
 
 .bm-mini__gem-icon {
-  width: 32px;
-  height: 32px;
+  width: 68%;
+  height: 68%;
   object-fit: contain;
   display: block;
   pointer-events: none;
@@ -510,7 +518,8 @@ button {
     drop-shadow(1px 0 0 #000)
     drop-shadow(-1px 0 0 #000)
     drop-shadow(0 1px 0 #000)
-    drop-shadow(0 -1px 0 #000);
+    drop-shadow(0 -1px 0 #000)
+    drop-shadow(0 calc(1px * var(--bm-ui-scale)) calc(2px * var(--bm-ui-scale)) rgba(0,0,0,.25));
 }
 
 .bm-drag-ghost {
