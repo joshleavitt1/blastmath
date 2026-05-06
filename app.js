@@ -841,7 +841,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
         var targetIndex = (spawnY * size) + x;
         
         var blastDistance = distanceToNearestBlast(
-          targetIndex,var shouldSpawnWall = Math.random() < wallChance;
+          targetIndex,
           state.lastBlastIndices,
           size
         );
