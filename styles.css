@@ -438,8 +438,8 @@ button {
 }
 
 .bm-hand-slot {
-  width: calc(63px * var(--bm-ui-scale));
-  height: calc(63px * var(--bm-ui-scale));
+  width: calc(61px * var(--bm-ui-scale));
+  height: calc(61px * var(--bm-ui-scale));
 
   display: flex;
   align-items: center;
@@ -456,8 +456,8 @@ button {
   height: max-content;
   margin: 0 auto;
   background: #000;
-  padding: calc(5px * var(--bm-ui-scale));
-  border-radius: calc(7px * var(--bm-ui-scale));
+  padding: calc(4px * var(--bm-ui-scale));
+  border-radius: calc(6px * var(--bm-ui-scale));
 }
 
 .bm-piece.is-held {
