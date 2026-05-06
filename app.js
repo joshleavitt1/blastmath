@@ -785,6 +785,26 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     });
   }
 
+  function distanceToNearestBlast(index, blastIndices, size) {
+    if (!blastIndices || !blastIndices.length) return 999;
+  
+    var x = index % size;
+    var y = Math.floor(index / size);
+  
+    var best = 999;
+  
+    blastIndices.forEach(function (blastIndex) {
+      var bx = blastIndex % size;
+      var by = Math.floor(blastIndex / size);
+  
+      var dist = Math.abs(bx - x) + Math.abs(by - y);
+  
+      if (dist < best) best = dist;
+    });
+  
+    return best;
+  }
+
   function applyGravityWithRefill(board, size) {
     var moved = [];
     var next = createEmptyBoard(size);
@@ -818,13 +838,37 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
         }
 
         var nearTypes = getNearMatchGemTypes(board, size);
+
+        var targetIndex = (spawnY * size) + x;
+        
+        var blastDistance = distanceToNearestBlast(
+          targetIndex,
+          state.lastBlastIndices,
+          size
+        );
+        
+        var farFromBlast = blastDistance >= 3;
+        
+        if (farFromBlast) {
+          wallChance += 0.12;
+        }
+        
         var shouldSpawnWall = Math.random() < wallChance;
+        
         var spawn;
 
         if (shouldSpawnWall) {
           spawn = makeWallCell();
-        } else if (boost > 0 && nearTypes.length && Math.random() < boost) {
-          spawn = makeGemCell(nearTypes[Math.floor(Math.random() * nearTypes.length)]);
+        } else if (
+          boost > 0 &&
+          nearTypes.length &&
+          Math.random() < (farFromBlast ? boost * 0.35 : boost)
+        ) {
+          // Near blast zone = continuation potential
+          // Far away = diversity
+          spawn = makeGemCell(
+            nearTypes[Math.floor(Math.random() * nearTypes.length)]
+          );
         } else {
           spawn = makeGemCell();
         }
@@ -1362,6 +1406,7 @@ if (board) board.classList.remove('is-dragging');
 
     state.comboStep = comboStep;
     state.blastIndices = result.blastIndices.slice();
+    state.lastBlastIndices = result.blastIndices.slice();
     state.pendingBombIndices = [];
     addScore(result.scoreValue);
 
