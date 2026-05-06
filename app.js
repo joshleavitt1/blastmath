@@ -25,17 +25,17 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     primePlacementBoost: 0.34,
     primeAdjacentBoost: 0.18,
     boostDecayPerMove: 0.08,
-    openingWallChance: 0.34,
+    openingWallChance: 0.42,
 
     earlyComboMoves: 12,
-    earlyComboRefillBoost: 0.88,
-    earlyComboWallReduction: 0.38,
-
+    earlyComboRefillBoost: 0.76,
+    earlyComboWallReduction: 0.12,
+    
     hugeComboTarget: 8,
     hugeComboEveryMoves: 8,
     hugeComboChargeStart: 5,
-    hugeComboRefillBoost: 0.94,
-    hugeComboWallReduction: 0.46
+    hugeComboRefillBoost: 0.82,
+    hugeComboWallReduction: 0.16
   };
 
   var GEM_TYPES = ['star', 'diamond', 'pent'];
@@ -196,14 +196,13 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   
     var ratio = wallCount / board.length;
   
-    // 📊 tiered buckets
-    if (ratio >= 0.60) return 0.00; // 60%+
-    if (ratio >= 0.50) return 0.10; // 50%
-    if (ratio >= 0.40) return 0.20; // 40%
-    if (ratio >= 0.30) return 0.30; // 30%
-    
-    // 0%–30%
-    return 0.40;
+    if (ratio >= 0.65) return 0.08;
+    if (ratio >= 0.55) return 0.18;
+    if (ratio >= 0.45) return 0.30;
+    if (ratio >= 0.35) return 0.42;
+    if (ratio >= 0.25) return 0.54;
+  
+    return 0.68;
   }
 
   function randomGemType() {
@@ -842,7 +841,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
         var targetIndex = (spawnY * size) + x;
         
         var blastDistance = distanceToNearestBlast(
-          targetIndex,
+          targetIndex,var shouldSpawnWall = Math.random() < wallChance;
           state.lastBlastIndices,
           size
         );
@@ -850,9 +849,10 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
         var farFromBlast = blastDistance >= 3;
         
         if (farFromBlast) {
-          wallChance += 0.12;
+          wallChance += 0.26;
         }
         
+        wallChance = Math.max(0.10, Math.min(0.78, wallChance));
         var shouldSpawnWall = Math.random() < wallChance;
         
         var spawn;
