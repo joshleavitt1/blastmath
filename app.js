@@ -1360,7 +1360,7 @@ if (board) board.classList.remove('is-dragging');
   
       window.setTimeout(function () {
         continueFinishResolveAfterChainPayoff();
-      }, 520);
+      }, 1360);
   
       return;
     }

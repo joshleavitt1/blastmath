@@ -425,8 +425,8 @@ button {
 }
 
 .bm-hand-slot {
-  width: calc(61px * var(--bm-ui-scale));
-  height: calc(61px * var(--bm-ui-scale));
+  width: 61px;
+  height: 61px;
 
   display: flex;
   align-items: center;
@@ -443,8 +443,8 @@ button {
   height: max-content;
   margin: 0 auto;
   background: #000;
-  padding: calc(4px * var(--bm-ui-scale));
-  border-radius: calc(6px * var(--bm-ui-scale));
+  padding: 4px;
+  border-radius: 6px;
 }
 
 .bm-piece.is-held {
@@ -461,8 +461,8 @@ button {
 
 .bm-mini {
   position: absolute;
-  width: calc(53px * var(--bm-ui-scale));
-  height: calc(53px * var(--bm-ui-scale));
+  width: 53px;
+  height: 53px;
   display: grid;
   place-items: center;
   border-radius: calc(4px * var(--bm-ui-scale));
@@ -500,8 +500,8 @@ button {
 }
 
 .bm-mini__gem-icon {
-  width: calc(32px * var(--bm-ui-scale));
-  height: calc(32px * var(--bm-ui-scale));
+  width: 32px;
+  height: 32px;
   object-fit: contain;
   display: block;
   pointer-events: none;
