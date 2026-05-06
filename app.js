@@ -18,7 +18,14 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     gravityMs: 460,
     blastBreathMs: 70,
     chainDelayMs: 55,
-    placeResolveDelayMs: 35
+    placeResolveDelayMs: 35,
+    firstAssistMoves: 5,
+    primeCellCount: 3,
+    earlyAssistBoost: 0.55,
+    primePlacementBoost: 0.34,
+    primeAdjacentBoost: 0.18,
+    boostDecayPerMove: 0.08,
+    openingWallChance: 0.34
   };
 
   var GEM_TYPES = ['star', 'diamond', 'pent'];
@@ -197,29 +204,56 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     return GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)];
   }
 
-  function createOpeningBoard() {
-    var board = createEmptyBoard(CONFIG.boardSize);
-    var S = CONFIG.boardSize;
+  function wouldCreateOpeningMatch(board, size, index, gemType) {
+    var x = index % size;
+    var y = Math.floor(index / size);
 
-    function put(x, y, cell) {
-      board[(y * S) + x] = cell;
+    function typeAt(xx, yy) {
+      if (xx < 0 || xx >= size || yy < 0 || yy >= size) return null;
+
+      var cell = board[(yy * size) + xx];
+
+      return isGemCell(cell) ? cell.gemType : null;
     }
 
-    var layout = [
-      ['brick','brick','brick','star','star','star','brick'],
-      ['brick','star','star','brick','diamond','brick','brick'],
-      ['diamond','star','diamond','star','star','pent','star'],
-      ['diamond','brick','star','diamond','brick','diamond','brick'],
-      ['pent','brick','brick','pent','brick','pent','diamond'],
-      ['diamond','brick','diamond','star','brick','diamond','pent'],
-      ['brick','brick','star','diamond','brick','pent','pent']
-    ];
+    var horizontal =
+      (typeAt(x - 2, y) === gemType && typeAt(x - 1, y) === gemType) ||
+      (typeAt(x - 1, y) === gemType && typeAt(x + 1, y) === gemType) ||
+      (typeAt(x + 1, y) === gemType && typeAt(x + 2, y) === gemType);
 
-    layout.forEach(function (row, y) {
-      row.forEach(function (value, x) {
-        put(x, y, value === 'brick' ? makeWallCell() : makeGemCell(value));
-      });
-    });
+    var vertical =
+      (typeAt(x, y - 2) === gemType && typeAt(x, y - 1) === gemType) ||
+      (typeAt(x, y - 1) === gemType && typeAt(x, y + 1) === gemType) ||
+      (typeAt(x, y + 1) === gemType && typeAt(x, y + 2) === gemType);
+
+    return horizontal || vertical;
+  }
+
+  function createOpeningBoard() {
+    var size = CONFIG.boardSize;
+    var board = createEmptyBoard(size);
+
+    for (var i = 0; i < board.length; i++) {
+      if (Math.random() < CONFIG.openingWallChance) {
+        board[i] = makeWallCell();
+        continue;
+      }
+
+      var options = GEM_TYPES.slice();
+
+      for (var tries = 0; tries < 8; tries++) {
+        var type = options[Math.floor(Math.random() * options.length)];
+
+        if (!wouldCreateOpeningMatch(board, size, i, type)) {
+          board[i] = makeGemCell(type);
+          break;
+        }
+      }
+
+      if (!board[i]) {
+        board[i] = makeGemCell(GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)]);
+      }
+    }
 
     return board;
   }
@@ -439,6 +473,146 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     return out;
   }
 
+
+  function isAdjacentIndex(a, b, size) {
+    var ax = a % size;
+    var ay = Math.floor(a / size);
+    var bx = b % size;
+    var by = Math.floor(b / size);
+
+    return Math.abs(ax - bx) + Math.abs(ay - by) === 1;
+  }
+
+  function scorePlacementOpportunity(board, size, index, gemType) {
+    if (!isGemCell(board[index]) && gemType !== 'hex') return -999;
+
+    var test = board.slice();
+    test[index] = makeGemCell(gemType);
+
+    var result = classifyBlastPhase(test, size, 1);
+    var score = 0;
+
+    if (result.hasBlast) score += 100;
+    if (result.totalGroups >= 2) score += 80;
+
+    getNeighborIndices(index, size).forEach(function (neighbor) {
+      var cell = board[neighbor];
+
+      if (isGemCell(cell) && cell.gemType === gemType) score += 18;
+      if (isWallCell(cell)) score += 10;
+    });
+
+    if (gemType === 'hex') score += 35;
+
+    return score + Math.random() * 12;
+  }
+
+  function chooseAssistTarget(board, hand, size) {
+    var best = null;
+
+    hand.forEach(function (piece, slotIndex) {
+      if (!piece) return;
+
+      var gemType = piece.cells[0].gemType;
+
+      for (var i = 0; i < board.length; i++) {
+        var placed = getPlacementCells(board, size, piece, i % size, Math.floor(i / size));
+        if (!placed) continue;
+
+        var score = scorePlacementOpportunity(board, size, placed[0].index, gemType);
+
+        if (!best || score > best.score) {
+          best = {
+            index: placed[0].index,
+            gemType: gemType,
+            slotIndex: slotIndex,
+            score: score
+          };
+        }
+      }
+    });
+
+    return best;
+  }
+
+  function choosePrimeCells(board, hand, size) {
+    var candidates = [];
+
+    hand.forEach(function (piece, slotIndex) {
+      if (!piece) return;
+
+      var gemType = piece.cells[0].gemType;
+
+      for (var i = 0; i < board.length; i++) {
+        var placed = getPlacementCells(board, size, piece, i % size, Math.floor(i / size));
+        if (!placed) continue;
+
+        candidates.push({
+          index: placed[0].index,
+          gemType: gemType,
+          slotIndex: slotIndex,
+          score: scorePlacementOpportunity(board, size, placed[0].index, gemType)
+        });
+      }
+    });
+
+    candidates.sort(function (a, b) {
+      return b.score - a.score;
+    });
+
+    var picked = [];
+    var used = new Set();
+
+    candidates.forEach(function (candidate) {
+      if (picked.length >= CONFIG.primeCellCount) return;
+      if (used.has(candidate.index)) return;
+
+      used.add(candidate.index);
+      picked.push(candidate);
+    });
+
+    return picked;
+  }
+
+  function updateAssistSystem() {
+    if (!state || state.resolving) return;
+
+    var assist = chooseAssistTarget(state.board, state.hand, state.boardSize);
+    var primes = choosePrimeCells(state.board, state.hand, state.boardSize);
+
+    if (state.moveCount < CONFIG.firstAssistMoves && assist) {
+      state.assistTargetIndex = assist.index;
+      state.assistGemType = assist.gemType;
+      state.assistSlotIndex = assist.slotIndex;
+      state.primeCells = [];
+    } else {
+      state.assistTargetIndex = null;
+      state.assistGemType = null;
+      state.assistSlotIndex = null;
+      state.primeCells = primes;
+    }
+  }
+
+  function getPlacementBoost(placedCells) {
+    var boost = 0;
+
+    placedCells.forEach(function (cell) {
+      if (state.assistTargetIndex === cell.index) {
+        boost += CONFIG.earlyAssistBoost;
+      }
+
+      (state.primeCells || []).forEach(function (prime) {
+        if (prime.index === cell.index) {
+          boost += CONFIG.primePlacementBoost;
+        } else if (isAdjacentIndex(prime.index, cell.index, state.boardSize)) {
+          boost += CONFIG.primeAdjacentBoost;
+        }
+      });
+    });
+
+    return Math.min(0.75, boost);
+  }
+
   function buildChainReactionIndices(result) {
     var size = state.boardSize;
     var start = result.gemBlastIndices && result.gemBlastIndices.length
@@ -621,7 +795,24 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
 
       for (var spawnY = 0; spawnY < emptyCount; spawnY++) {
         var wallChance = state.chainWallChance == null ? getAdaptiveWallChance(board) : state.chainWallChance;
-        var spawn = Math.random() < wallChance ? makeWallCell() : makeGemCell();
+        var boost = state.placementBoost || 0;
+
+        if (boost > 0) {
+          wallChance = Math.max(0, wallChance - (boost * 0.28));
+        }
+
+        var nearTypes = getNearMatchGemTypes(board, size);
+        var shouldSpawnWall = Math.random() < wallChance;
+        var spawn;
+
+        if (shouldSpawnWall) {
+          spawn = makeWallCell();
+        } else if (boost > 0 && nearTypes.length && Math.random() < boost) {
+          spawn = makeGemCell(nearTypes[Math.floor(Math.random() * nearTypes.length)]);
+        } else {
+          spawn = makeGemCell();
+        }
+
         next[(spawnY * size) + x] = spawn;
         moved.push({ x: x, fromY: spawnY - emptyCount, toY: spawnY });
       }
@@ -668,7 +859,12 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       maxChainBlastCount: 0,
       pendingWallPenalty: false,
       chainWallChance: null,
-      pendingBombIndices: []
+      pendingBombIndices: [],
+      assistTargetIndex: null,
+      assistGemType: null,
+      assistSlotIndex: null,
+      primeCells: [],
+      placementBoost: 0
     };
   }
 
@@ -755,7 +951,15 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   function renderBoard() {
     return state.board.map(function (cell, index) {
       var blasting = state.blastIndices.indexOf(index) !== -1;
-      var cellClass = 'bm-cell' + (blasting ? ' bm-cell--blasting' : '');
+      var isAssistTarget = state.assistTargetIndex === index;
+      var isPrimeTarget = (state.primeCells || []).some(function (prime) {
+        return prime.index === index;
+      });
+
+      var cellClass = 'bm-cell' +
+        (blasting ? ' bm-cell--blasting' : '') +
+        (isAssistTarget ? ' bm-cell--assist-target' : '') +
+        (isPrimeTarget ? ' bm-cell--prime-target' : '');
       var anim = animStyleFor(index, state.animMap);
       var extraClass = anim.className + (blasting ? ' bm-blast-pop' : '');
 
@@ -781,6 +985,7 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
 
   function renderApp() {
     syncUiScale();
+    updateAssistSystem();
   
     rootEl.innerHTML = '' +
       '<section class="bm-screen bm-game" data-game>' +
@@ -804,7 +1009,9 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
         '</div>' +
         '<div class="bm-spacer" aria-hidden="true"></div>' +
         '<div class="bm-hand">' + state.hand.map(function (piece, index) {
-          return '<div class="bm-hand-slot" data-hand-slot-index="' + index + '">' + renderPiece(piece) + '</div>';
+          var slotClass = 'bm-hand-slot' + (state.assistSlotIndex === index ? ' bm-hand-slot--assist' : '');
+
+          return '<div class="' + slotClass + '" data-hand-slot-index="' + index + '">' + renderPiece(piece) + '</div>';
         }).join('') + '</div>' +
       '</section>';
   
@@ -1077,6 +1284,7 @@ if (board) board.classList.remove('is-dragging');
 
     state.hand[slotIndex] = null;
     state.moveCount++;
+    state.placementBoost = getPlacementBoost(placedCells);
 
     state.animMap = buildPlacementAnimMap(placedCells.map(function (cell) { return cell.index; }));
     renderApp();
@@ -1199,6 +1407,8 @@ if (board) board.classList.remove('is-dragging');
     } else if (!hasAnyPlayableHand()) {
       state.hand = generateHand(state.board, state.boardSize);
     }
+
+    state.placementBoost = Math.max(0, (state.placementBoost || 0) - CONFIG.boostDecayPerMove);
   
     renderApp();
   }
