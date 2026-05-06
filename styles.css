@@ -357,8 +357,8 @@ button {
 .bm-gem-tile__icon {
   position: relative;
   z-index: 2;
-  width: calc(36px * var(--bm-ui-scale));
-  height: calc(36px * var(--bm-ui-scale));
+  width: 68%;
+  height: 68%;
   object-fit: contain;
   display: block;
   pointer-events: none;
@@ -376,18 +376,17 @@ button {
   border: 0;
   box-shadow: none;
   overflow: hidden;
-  transform: translateZ(0);
-  backface-visibility: hidden;
+  transform: translate3d(0,0,0);
 }
 
 .bm-neutral-block__img {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: contain;
+  object-fit: cover;
   pointer-events: none;
   image-rendering: auto;
-  transform: translateZ(0);
+  transform: translate3d(0,0,0) scale(1.002);
   backface-visibility: hidden;
 }
 
@@ -430,6 +429,12 @@ button {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+
+  width: calc(var(--bm-board-tile-size) + 28px);
+  height: calc(var(--bm-board-tile-size) + 28px);
+
+  cursor: grab;
+  touch-action: none;
 }
 
 .bm-piece {
@@ -534,21 +539,18 @@ button {
 }
 
 .bm-drag-ghost.is-snapped-to-board {
-  opacity: 0;
+  opacity: 1;
 }
 
 .bm-drag-ghost .bm-piece {
-  background: transparent !important;
-  padding: 0 !important;
-  border-radius: 0 !important;
+  background: #000 !important;
+  padding: 4px !important;
+  border-radius: 6px !important;
+  transform: scale(1.02);
 }
 
 .bm-drag-ghost .bm-piece__shape {
   background: transparent !important;
-}
-
-.bm-drag-ghost .bm-piece {
-  transform: scale(1.02);
 }
 
 .bm-gem-tile.bm-place-pop,
@@ -746,7 +748,7 @@ button {
 }
 
 .bm-board-message__inner {
-  animation: bmChainBlastPayoff 1220ms cubic-bezier(.16,1.15,.2,1) forwards;
+  animation: bmChainBlastPayoff 1580ms cubic-bezier(.16,1.15,.2,1) forwards;
 }
 
 .bm-board-message__svg {
@@ -783,31 +785,31 @@ button {
   0% {
     opacity: 0;
     transform: scale(.72) rotate(-3deg);
-    filter: brightness(.72) saturate(.72);
+    filter: brightness(1.08) saturate(1.08);
   }
 
   12% {
-    opacity: .42;
-    filter: brightness(.78) saturate(.65);
+    opacity: .7;
     transform: scale(1.10) rotate(1deg);
+    filter: brightness(1.12) saturate(1.08);
   }
 
   24% {
     opacity: 1;
     transform: scale(.98) rotate(0deg);
-    filter: brightness(1) saturate(1);
+    filter: brightness(1.06) saturate(1.06);
   }
 
-  74% {
+  88% {
     opacity: 1;
     transform: scale(1.02);
-    filter: brightness(1.02) saturate(1.02);
+    filter: brightness(1.08) saturate(1.08);
   }
 
   100% {
     opacity: 0;
-    transform: scale(.96) translateY(calc(-8px * var(--bm-ui-scale)));
-    filter: brightness(.94);
+    transform: scale(1.10) translateY(calc(-10px * var(--bm-ui-scale)));
+    filter: brightness(1.18) saturate(1.12);
   }
 }
 

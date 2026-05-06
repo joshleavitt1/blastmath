@@ -19,13 +19,23 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
     blastBreathMs: 70,
     chainDelayMs: 55,
     placeResolveDelayMs: 35,
-    firstAssistMoves: 5,
+    firstAssistMoves: 10,
     primeCellCount: 3,
     earlyAssistBoost: 0.55,
     primePlacementBoost: 0.34,
     primeAdjacentBoost: 0.18,
     boostDecayPerMove: 0.08,
-    openingWallChance: 0.34
+    openingWallChance: 0.34,
+
+    earlyComboMoves: 12,
+    earlyComboRefillBoost: 0.88,
+    earlyComboWallReduction: 0.38,
+
+    hugeComboTarget: 8,
+    hugeComboEveryMoves: 8,
+    hugeComboChargeStart: 5,
+    hugeComboRefillBoost: 0.94,
+    hugeComboWallReduction: 0.46
   };
 
   var GEM_TYPES = ['star', 'diamond', 'pent'];
@@ -148,16 +158,12 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
   }
 
   function makeWallCell(type) {
-    var wallType;
-  
-    if (type) {
-      wallType = type;
-    } else {
-      wallType = Math.random() < 0.6 ? 'brick_1' : 'brick_2';
-    }
-  
-    return { kind: 'wall', wallType: wallType };
+    return {
+      kind: 'wall',
+      wallType: type || 'brick'
+    };
   }
+
   function turnRandomGemIntoWall() {
     var gemIndices = [];
   
@@ -797,6 +803,16 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
         var wallChance = state.chainWallChance == null ? getAdaptiveWallChance(board) : state.chainWallChance;
         var boost = state.placementBoost || 0;
 
+        if (state.moveCount <= CONFIG.earlyComboMoves) {
+          boost = Math.max(boost, CONFIG.earlyComboRefillBoost);
+          wallChance = Math.max(0, wallChance - CONFIG.earlyComboWallReduction);
+        }
+
+        if ((state.turnsSinceHugeCombo || 0) >= CONFIG.hugeComboChargeStart) {
+          boost = Math.max(boost, CONFIG.hugeComboRefillBoost);
+          wallChance = Math.max(0, wallChance - CONFIG.hugeComboWallReduction);
+        }
+
         if (boost > 0) {
           wallChance = Math.max(0, wallChance - (boost * 0.28));
         }
@@ -864,7 +880,8 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
       assistGemType: null,
       assistSlotIndex: null,
       primeCells: [],
-      placementBoost: 0
+      placementBoost: 0,
+      turnsSinceHugeCombo: 0
     };
   }
 
@@ -929,18 +946,21 @@ window.trackEvent = window.trackEvent || function (eventName, props) {
 
   function renderPiece(piece) {
     if (!piece) return '';
-
-    var m = getPieceMetrics(piece);
+  
     var cells = piece.cells.map(function (cell) {
-      var left = Math.round(cell.x * m.step);
-      var top = Math.round(cell.y * m.step);
-      return '<div class="bm-mini bm-mini--gem" style="left:' + left + 'px;top:' + top + 'px;">' +
+      var left = 'calc(' + cell.x + ' * (var(--bm-board-tile-size) + var(--bm-cell-gap)))';
+      var top = 'calc(' + cell.y + ' * (var(--bm-board-tile-size) + var(--bm-cell-gap)))';
+  
+      return '<div class="bm-mini bm-mini--gem" style="left:' + left + ';top:' + top + ';">' +
         '<img class="bm-mini__gem-icon" src="' + TILE_PATH + escapeHtml(cell.gemType) + '.svg" alt="" />' +
       '</div>';
     }).join('');
-
+  
+    var shapeW = 'calc((' + piece.width + ' * var(--bm-board-tile-size)) + (' + (piece.width - 1) + ' * var(--bm-cell-gap)))';
+    var shapeH = 'calc((' + piece.height + ' * var(--bm-board-tile-size)) + (' + (piece.height - 1) + ' * var(--bm-cell-gap)))';
+  
     return '<div class="bm-piece" data-piece>' +
-      '<div class="bm-piece__shape" style="width:' + Math.round(m.width) + 'px;height:' + Math.round(m.height) + 'px;">' + cells + '</div>' +
+      '<div class="bm-piece__shape" style="width:' + shapeW + ';height:' + shapeH + ';">' + cells + '</div>' +
     '</div>';
   }
 
@@ -1115,6 +1135,15 @@ if (board) board.classList.add('is-dragging');
 
     var ghost = document.createElement('div');
     ghost.className = 'bm-drag-ghost';
+
+    var gameEl = rootEl.querySelector('[data-game]');
+    var gameStyles = gameEl ? getComputedStyle(gameEl) : null;
+
+    if (gameStyles) {
+      ghost.style.setProperty('--bm-board-tile-size', gameStyles.getPropertyValue('--bm-board-tile-size'));
+      ghost.style.setProperty('--bm-cell-gap', gameStyles.getPropertyValue('--bm-cell-gap'));
+    }
+    
     ghost.innerHTML = renderPiece(piece);
     document.body.appendChild(ghost);
 
@@ -1154,11 +1183,22 @@ if (board) board.classList.add('is-dragging');
 
     var x = latestPointer.x;
     var y = latestPointer.y - drag.liftY;
-    
-    drag.ghost.style.transform =
-      'translate3d(' + Math.round(x) + 'px,' + Math.round(y) + 'px,0) translate(-50%,-50%)';
-    
+
     var anchor = getAnchorFromPointer(drag.piece, x, y);
+
+    var ghostX = x;
+    var ghostY = y;
+
+    if (anchor && boardMetrics) {
+      var pieceW = (drag.piece.width * boardMetrics.cellSize) + ((drag.piece.width - 1) * boardMetrics.gap);
+      var pieceH = (drag.piece.height * boardMetrics.cellSize) + ((drag.piece.height - 1) * boardMetrics.gap);
+
+      ghostX = boardMetrics.left + boardMetrics.padding + (anchor.x * boardMetrics.step) + (pieceW / 2);
+      ghostY = boardMetrics.top + boardMetrics.padding + (anchor.y * boardMetrics.step) + (pieceH / 2);
+    }
+
+    drag.ghost.style.transform =
+      'translate3d(' + Math.round(ghostX) + 'px,' + Math.round(ghostY) + 'px,0) translate(-50%,-50%)';
     drag.anchor = anchor;
     drag.ghost.classList.toggle('is-snapped-to-board', !!anchor);
 
@@ -1366,6 +1406,12 @@ if (board) board.classList.remove('is-dragging');
 
   function finishResolve() {
     var finalChainCount = state.maxChainBlastCount || 0;
+
+    if (finalChainCount >= CONFIG.hugeComboTarget) {
+      state.turnsSinceHugeCombo = 0;
+    } else {
+      state.turnsSinceHugeCombo = (state.turnsSinceHugeCombo || 0) + 1;
+    }
   
     if (finalChainCount >= 2) {
       showBoardMessage('BLAST x' + finalChainCount, 'chain');
@@ -1630,7 +1676,7 @@ if (board) board.classList.remove('is-dragging');
   
     window.setTimeout(function () {
       if (msg.parentNode) msg.parentNode.removeChild(msg);
-    }, 1320);
+    }, 1680);
   }
 
   function boot() {
